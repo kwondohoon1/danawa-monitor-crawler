@@ -1,8 +1,2 @@
-<<<<<<< HEAD
-with open("requirements.txt", "w") as f:
-    f.write("selenium\n")
-    f.write("pandas\n")
-=======
 selenium
 pandas
->>>>>>> 8ddc77a (✅ requirements.txt 다시 정리)
