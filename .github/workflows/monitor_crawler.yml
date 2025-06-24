@@ -2,7 +2,7 @@ name: Daily Monitor Crawler
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 매일 자정 (UTC 기준 → 한국시간 오전 9시)
+    - cron: '0 0 * * *'
   workflow_dispatch:
 
 jobs:
