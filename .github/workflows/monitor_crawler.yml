@@ -16,14 +16,14 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: 3.10
+        python-version: "3.10"
 
     - name: Install dependencies
       run: |
         pip install -r requirements.txt
         sudo apt-get update
         sudo apt-get install -y chromium-chromedriver
-        sudo ln -s /usr/lib/chromium-browser/chromedriver /usr/bin/chromedriver
+        sudo ln -sf /usr/lib/chromium-browser/chromedriver /usr/bin/chromedriver
 
     - name: Run monitor crawler
       run: python monitor_crawler_batch.py
