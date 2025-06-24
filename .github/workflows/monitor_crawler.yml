@@ -23,7 +23,9 @@ jobs:
         pip install selenium pandas
         sudo apt-get update
         sudo apt-get install -y chromium-chromedriver
-        sudo ln -sf /usr/lib/chromium-browser/chromedriver /usr/bin/chromedriver || true
+        which chromedriver || echo "❌ chromedriver 설치 실패"
+        sudo ln -sf $(which chromedriver) /usr/bin/chromedriver || true
+        chromedriver --version || echo "chromedriver 실행 안됨"
 
     - name: Run monitor crawler
       run: python monitor_crawler_batch.py
@@ -34,6 +36,7 @@ jobs:
       run: |
         git config --global user.name "kwondohoon1"
         git config --global user.email "kwondohoon1@naver.com"
+        git pull origin main || true
         git add monitor_list.csv
         git commit -m "📊 monitor_list.csv 자동 업데이트" || echo "변경 없음"
-        git push https://kwondohoon1:${GH_TOKEN}@github.com/kwondohoon1/danawa-monitor-crawler.git
+        git push https://kwondohoon1:${GH_TOKEN}@github.com/kwondohoon1/danawa-monitor-crawler.git || echo "❌ Push 실패"
