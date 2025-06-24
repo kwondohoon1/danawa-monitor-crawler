@@ -29,9 +29,12 @@ jobs:
         sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get -f install -y
         sudo apt-get install -y google-chrome-stable
 
-        # ✅ 정확한 버전 추출 및 매칭 드라이버 버전 확인
-        CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+' | head -n1)
-        CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
+        # ✅ 정확한 버전 추출 및 매칭 드라이버 버전 확인 (major 버전 기준)
+        CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+\.\d+')
+        CHROME_MAJOR=$(echo "$CHROME_VERSION" | cut -d '.' -f 1)
+        echo "🧩 Chrome version: $CHROME_VERSION / major: $CHROME_MAJOR"
+
+        CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR}")
         echo "🎯 Matching ChromeDriver version: $CHROMEDRIVER_VERSION"
 
         wget https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip
