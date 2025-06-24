@@ -1,1 +1,3 @@
-selenium\npandas
+with open("requirements.txt", "w") as f:
+    f.write("selenium\n")
+    f.write("pandas\n")
