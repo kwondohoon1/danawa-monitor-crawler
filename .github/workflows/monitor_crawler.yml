@@ -61,4 +61,8 @@ jobs:
         git pull origin main || true
         git add monitor_list.csv
         git commit -m "📊 monitor_list.csv 자동 업데이트" || echo "변경 없음"
-        git push https://x-access-token:${GITHUB_TOKEN}@github.com/kwondohoon1/danawa-monitor-crawler.git || echo "❌ Push 실패"
+
+        # ✅ GITHUB_TOKEN을 통한 인증 URL로 origin remote 설정
+        git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/kwondohoon1/danawa-monitor-crawler.git
+
+        git push origin main || echo "❌ Push 실패"
