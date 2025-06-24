@@ -52,7 +52,7 @@ jobs:
     - name: Run monitor crawler
       run: python monitor_crawler_batch.py
 
-    - name: Commit and push result
+     - name: Commit and push result
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
