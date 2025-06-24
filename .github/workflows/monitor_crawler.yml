@@ -54,7 +54,7 @@ jobs:
 
     - name: Commit and push result
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
         git config --global user.name "kwondohoon1"
         git config --global user.email "kwondohoon1@naver.com"
@@ -62,7 +62,7 @@ jobs:
         git add monitor_list.csv
         git commit -m "📊 monitor_list.csv 자동 업데이트" || echo "변경 없음"
 
-        # ✅ GITHUB_TOKEN을 통한 인증 URL로 origin remote 설정
-        git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/kwondohoon1/danawa-monitor-crawler.git
+        # ✅ GH_TOKEN으로 인증된 origin remote 설정
+        git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/kwondohoon1/danawa-monitor-crawler.git
 
         git push origin main || echo "❌ Push 실패"
