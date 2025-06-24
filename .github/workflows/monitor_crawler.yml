@@ -54,11 +54,11 @@ jobs:
 
     - name: Commit and push result
       env:
-        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         git config --global user.name "kwondohoon1"
         git config --global user.email "kwondohoon1@naver.com"
         git pull origin main || true
         git add monitor_list.csv
         git commit -m "📊 monitor_list.csv 자동 업데이트" || echo "변경 없음"
-        git push https://${GH_TOKEN}@github.com/kwondohoon1/danawa-monitor-crawler.git || echo "❌ Push 실패"
+        git push https://x-access-token:${GITHUB_TOKEN}@github.com/kwondohoon1/danawa-monitor-crawler.git || echo "❌ Push 실패"
