@@ -18,18 +18,22 @@ jobs:
       with:
         python-version: "3.10"
 
-    - name: Install Google Chrome & Chromedriver (matching version)
+    - name: Install Google Chrome & Chromedriver (stable release)
       run: |
         sudo apt-get update
         sudo apt-get install -y wget unzip curl
         wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
         sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get -f install -y
-        CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')
-        echo "🧩 Chrome version: $CHROME_VERSION"
-        wget https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chromedriver-linux64.zip
-        unzip chromedriver-linux64.zip
-        sudo mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
+        sudo apt-get install -y google-chrome-stable
+
+        # ✅ ChromeDriver 최신 안정 버전 설치
+        CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE")
+        echo "🧩 ChromeDriver version: $CHROMEDRIVER_VERSION"
+        wget https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip
+        unzip chromedriver_linux64.zip
+        sudo mv chromedriver /usr/local/bin/chromedriver
         sudo chmod +x /usr/local/bin/chromedriver
+
         chromedriver --version
         google-chrome --version
 
