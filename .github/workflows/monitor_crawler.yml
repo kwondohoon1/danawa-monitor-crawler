@@ -2,7 +2,7 @@ name: Daily Monitor Crawler
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 매일 자정 (UTC)
+    - cron: '0 0 * * *'
   workflow_dispatch:
 
 jobs:
@@ -23,26 +23,20 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y wget unzip curl
 
-        # ✅ 기존 chromedriver 제거
         sudo rm -f /usr/bin/chromedriver /usr/local/bin/chromedriver
 
-        # ✅ 최신 Chrome 설치
         wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
         sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get -f install -y
         sudo apt-get install -y google-chrome-stable
 
-        # ✅ 정확한 Chrome 버전에 맞는 Chromedriver URL 파악
-        CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')
-        echo "🧩 Chrome version: $CHROME_VERSION"
+        # ✅ 정확한 버전 추출 및 매칭 드라이버 버전 확인
+        CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+' | head -n1)
+        CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
+        echo "🎯 Matching ChromeDriver version: $CHROMEDRIVER_VERSION"
 
-        # ✅ 버전 문자열 변환: 137.0.7151.119 → 137.0.7151.119
-        CHROMEDRIVER_VERSION=$CHROME_VERSION
-
-        # ✅ ChromeDriver 다운로드
-        wget https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip ||         wget https://storage.googleapis.com/chrome-for-testing-public/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip
-
-        unzip chromedriver-linux64.zip
-        sudo mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
+        wget https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip
+        unzip chromedriver_linux64.zip
+        sudo mv chromedriver /usr/local/bin/chromedriver
         sudo chmod +x /usr/local/bin/chromedriver
 
         chromedriver --version
