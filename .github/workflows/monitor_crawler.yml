@@ -2,8 +2,8 @@ name: Daily Monitor Crawler
 
 on:
   schedule:
-    - cron: '0 0 * * *'
-  workflow_dispatch:
+    - cron: '0 0 * * *'  # 매일 자정(UTC)
+  workflow_dispatch:      # 수동 실행도 허용
 
 jobs:
   crawl:
@@ -20,16 +20,15 @@ jobs:
 
     - name: Install dependencies
       run: |
-        pip install -r requirements.txt
+        pip install selenium pandas
         sudo apt-get update
         sudo apt-get install -y chromium-chromedriver
+        sudo ln -sf /usr/lib/chromium-browser/chromedriver /usr/bin/chromedriver || true
 
     - name: Run monitor crawler
-      env:
-        PATH: "/usr/lib/chromium-browser:$PATH"
       run: python monitor_crawler_batch.py
 
-    - name: Commit and Push Result
+    - name: Commit result
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
@@ -37,4 +36,4 @@ jobs:
         git config --global user.email "kwondohoon1@naver.com"
         git add monitor_list.csv
         git commit -m "📊 monitor_list.csv 자동 업데이트" || echo "변경 없음"
-        git push https://x-access-token:${GH_TOKEN}@github.com/kwondohoon1/danawa-monitor-crawler.git HEAD:main
+        git push https://kwondohoon1:${GH_TOKEN}@github.com/kwondohoon1/danawa-monitor-crawler.git
