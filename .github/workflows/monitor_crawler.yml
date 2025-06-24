@@ -29,7 +29,9 @@ jobs:
         PATH: "/usr/lib/chromium-browser:$PATH"
       run: python monitor_crawler_batch.py
 
-    - name: Commit result
+    - name: Commit and Push Result
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
         git config --global user.name "kwondohoon1"
         git config --global user.email "kwondohoon1@naver.com"
