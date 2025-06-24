@@ -54,7 +54,7 @@ def crawl_monitor_list():
                 continue
 
         page += 1
-        if page > 5:  # 🔴 실사용 시 이 조건 제거
+        if page > 150:  
             break
 
     driver.quit()
