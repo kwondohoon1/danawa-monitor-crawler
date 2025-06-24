@@ -4,7 +4,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 
-def crawl_monitor_list(max_pages=150):
+def crawl_monitor_list():
     options = Options()
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
@@ -15,8 +15,9 @@ def crawl_monitor_list(max_pages=150):
     base_url = "https://prod.danawa.com/list/?cate=112757"
 
     results = []
+    page = 1
 
-    for page in range(1, max_pages + 1):
+    while True:
         url = f"{base_url}&page={page}"
         print(f"🔍 크롤링 중: {url}")
         driver.get(url)
@@ -24,7 +25,6 @@ def crawl_monitor_list(max_pages=150):
 
         product_list = driver.find_elements(By.CSS_SELECTOR, "ul.product_list li.prod_item")
         if not product_list:
-            print("📭 더 이상 제품 없음. 중단합니다.")
             break
 
         for product in product_list:
@@ -34,7 +34,6 @@ def crawl_monitor_list(max_pages=150):
 
                 model_name = product.find_element(By.CSS_SELECTOR, "p.prod_name a").text.strip()
                 product_id = product.get_attribute("id").replace("productItem", "").strip()
-
                 try:
                     price = product.find_element(By.CSS_SELECTOR, "p.price_sect strong").text.replace(",", "").strip()
                 except:
@@ -45,9 +44,14 @@ def crawl_monitor_list(max_pages=150):
                     "모델명": model_name,
                     "가격": price
                 })
+
             except Exception as e:
                 print(f"❌ 오류: {e}")
                 continue
+
+        page += 1
+        if page > 5: 
+            break
 
     driver.quit()
     df = pd.DataFrame(results)
