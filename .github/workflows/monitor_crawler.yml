@@ -23,9 +23,10 @@ jobs:
         pip install -r requirements.txt
         sudo apt-get update
         sudo apt-get install -y chromium-chromedriver
-        sudo ln -sf /usr/lib/chromium-browser/chromedriver /usr/bin/chromedriver || true
 
     - name: Run monitor crawler
+      env:
+        PATH: "/usr/lib/chromium-browser:$PATH"
       run: python monitor_crawler_batch.py
 
     - name: Commit result
