@@ -9,6 +9,8 @@ def crawl_monitor_list():
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--remote-debugging-port=9222')
     options.add_argument("lang=ko_KR")
 
     driver = webdriver.Chrome(options=options)
