@@ -2,8 +2,8 @@ name: Daily Monitor Crawler
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 매일 자정(UTC 기준)
-  workflow_dispatch:      # 수동 실행 허용
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 jobs:
   crawl:
@@ -38,7 +38,7 @@ jobs:
     - name: Run monitor crawler
       run: python monitor_crawler_batch.py
 
-    - name: Commit result
+    - name: Commit and push result
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
@@ -47,4 +47,4 @@ jobs:
         git pull origin main || true
         git add monitor_list.csv
         git commit -m "📊 monitor_list.csv 자동 업데이트" || echo "변경 없음"
-        git push https://kwondohoon1:${GH_TOKEN}@github.com/kwondohoon1/danawa-monitor-crawler.git || echo "❌ Push 실패""
+        git push https://${GH_TOKEN}@github.com/kwondohoon1/danawa-monitor-crawler.git || echo "❌ Push 실패"
