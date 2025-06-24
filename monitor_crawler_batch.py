@@ -11,6 +11,7 @@ def crawl_monitor_list():
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--disable-gpu')
     options.add_argument('--remote-debugging-port=9222')
+    options.add_argument('--window-size=1920x1080')
     options.add_argument("lang=ko_KR")
 
     driver = webdriver.Chrome(options=options)
@@ -23,10 +24,11 @@ def crawl_monitor_list():
         url = f"{base_url}&page={page}"
         print(f"🔍 크롤링 중: {url}")
         driver.get(url)
-        time.sleep(1.5)
+        time.sleep(2)
 
         product_list = driver.find_elements(By.CSS_SELECTOR, "ul.product_list li.prod_item")
         if not product_list:
+            print("❌ 상품 리스트 없음 → 종료")
             break
 
         for product in product_list:
@@ -48,11 +50,11 @@ def crawl_monitor_list():
                 })
 
             except Exception as e:
-                print(f"❌ 오류: {e}")
+                print(f"❌ 오류 발생: {e}")
                 continue
 
         page += 1
-        if page > 5: 
+        if page > 5:  # 🔴 실사용 시 이 조건 제거
             break
 
     driver.quit()
