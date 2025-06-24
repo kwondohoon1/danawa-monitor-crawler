@@ -2,7 +2,7 @@ name: Daily Monitor Crawler
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 매일 자정 (UTC)
+    - cron: '0 0 * * *'
   workflow_dispatch:
 
 jobs:
@@ -25,30 +25,22 @@ jobs:
 
         sudo rm -f /usr/bin/chromedriver /usr/local/bin/chromedriver
 
+        # ✅ Chrome 설치
         wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
         sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get -f install -y
         sudo apt-get install -y google-chrome-stable
 
-        # ✅ 정확한 버전 추출 및 매칭 드라이버 버전 확인 (major 기준)
+        # ✅ 크롬 버전 전체 추출
         CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+\.\d+')
-        CHROME_MAJOR=$(echo "$CHROME_VERSION" | cut -d '.' -f 1)
+        echo "🧩 Chrome version: $CHROME_VERSION"
 
-        echo "🧩 Chrome version: $CHROME_VERSION / major: $CHROME_MAJOR"
+        # ✅ 새 저장소에서 드라이버 다운로드
+        DOWNLOAD_URL="https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROME_VERSION}/linux64/chromedriver-linux64.zip"
+        echo "📦 Downloading from: $DOWNLOAD_URL"
 
-        # ✅ 드라이버 버전 조회 + 유효성 검사
-        CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR}")
-
-        if [[ "$CHROMEDRIVER_VERSION" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
-          echo "🎯 Matching ChromeDriver version: $CHROMEDRIVER_VERSION"
-        else
-          echo "❌ 유효하지 않은 ChromeDriver 버전 응답: $CHROMEDRIVER_VERSION"
-          exit 1
-        fi
-
-        # ✅ 드라이버 다운로드
-        wget https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip
-        unzip chromedriver_linux64.zip
-        sudo mv chromedriver /usr/local/bin/chromedriver
+        wget $DOWNLOAD_URL -O chromedriver.zip || (echo "❌ 드라이버 다운로드 실패" && exit 1)
+        unzip chromedriver.zip
+        sudo mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
         sudo chmod +x /usr/local/bin/chromedriver
 
         chromedriver --version
