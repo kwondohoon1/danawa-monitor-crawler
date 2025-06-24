@@ -2,8 +2,8 @@ name: Daily Monitor Crawler
 
 on:
   schedule:
-    - cron: '0 0 * * *'
-  workflow_dispatch:
+    - cron: '0 0 * * *'  # 매일 자정 (UTC)
+  workflow_dispatch:      # 수동 실행도 허용
 
 jobs:
   crawl:
@@ -21,16 +21,17 @@ jobs:
     - name: Install Google Chrome & Chromedriver
       run: |
         sudo apt-get update
-        sudo apt-get install -y wget unzip
+        sudo apt-get install -y wget unzip curl
         wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
         sudo apt install -y ./google-chrome-stable_current_amd64.deb
-        LATEST=$(curl -sSL https://chromedriver.storage.googleapis.com/LATEST_RELEASE)
-        wget https://chromedriver.storage.googleapis.com/${LATEST}/chromedriver_linux64.zip
+        CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+')
+        CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE")
+        wget https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip
         unzip chromedriver_linux64.zip
         sudo mv chromedriver /usr/bin/chromedriver
         sudo chmod +x /usr/bin/chromedriver
-        which chromedriver && chromedriver --version
-        which google-chrome && google-chrome --version
+        chromedriver --version
+        google-chrome --version
 
     - name: Install Python dependencies
       run: pip install selenium pandas
