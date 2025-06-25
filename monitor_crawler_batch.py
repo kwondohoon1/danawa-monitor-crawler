@@ -38,10 +38,18 @@ def crawl_monitor_list(crawling_url, max_page=20):
                     continue
                 product_id = product.get_attribute("id").replace("productItem", "")
                 model_name = product.find_element(By.XPATH, './div/div[2]/p/a').text.strip()
+
+                # 가격 파싱 시도 (2가지 구조 대응)
+                price = "가격없음"
                 try:
-                    price = product.find_element(By.XPATH, './div/div[3]/p/strong').text.replace(",", "").strip()
+                    # 방법 1: 대표 가격 (단일 strong 태그)
+                    price = product.find_element(By.CSS_SELECTOR, 'p.price_sect strong').text.replace(",", "").strip()
                 except:
-                    price = "가격없음"
+                    try:
+                        # 방법 2: 다중 쇼핑몰 가격 중 첫 번째 가격
+                        price = product.find_element(By.CSS_SELECTOR, 'ul > li.mall_list_item > a > p.price_sect > strong').text.replace(",", "").strip()
+                    except:
+                        pass
 
                 results.append({
                     "상품코드": product_id,
@@ -51,6 +59,7 @@ def crawl_monitor_list(crawling_url, max_page=20):
             except:
                 continue
 
+        # 페이지 이동
         try:
             if i % 10 == 0:
                 driver.find_element(By.XPATH, '//a[@class="edge_nav nav_next"]').click()
