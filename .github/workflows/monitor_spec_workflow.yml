@@ -2,96 +2,58 @@ name: Daily Monitor Spec Crawler
 
 on:
   schedule:
-    - cron: '30 15 * * *'  # 한국시간 자정 30분
-  workflow_dispatch:
+    - cron: '30 15 * * *'  # 매일 자정 실행
+  workflow_dispatch:     # 수동 실행 버튼
 
 jobs:
-  split-spec-crawlers:
+  crawl:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        part: [0, 1, 2]  # 3등분 (0, 1, 2)
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.10"
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
 
-      - name: Install Chrome & Chromedriver
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget unzip curl
-          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get -f install -y
-          sudo apt-get install -y google-chrome-stable
-          CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+\.\d+')
-          DOWNLOAD_URL="https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROME_VERSION}/linux64/chromedriver-linux64.zip"
-          wget $DOWNLOAD_URL -O chromedriver.zip
-          unzip chromedriver.zip
-          sudo mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
-          sudo chmod +x /usr/local/bin/chromedriver
+    - name: Install Google Chrome & Chromedriver
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget unzip curl
 
-      - name: Install Python dependencies
-        run: pip install selenium pandas
+        wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+        sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get -f install -y
+        sudo apt-get install -y google-chrome-stable
 
-      - name: Run spec crawler for part ${{ matrix.part }}
-        run: |
-          python -c "
-import pandas as pd
-import math
+        CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+\.\d+')
+        DOWNLOAD_URL="https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROME_VERSION}/linux64/chromedriver-linux64.zip"
+        wget $DOWNLOAD_URL -O chromedriver.zip || (echo "❌ 크롬 드라이버 다운로드 실패" && exit 1)
+        unzip chromedriver.zip
+        sudo mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
+        sudo chmod +x /usr/local/bin/chromedriver
 
-df = pd.read_csv('monitor_list.csv', encoding='utf-8-sig')
-total = len(df)
-chunk = math.ceil(total / 3)
-start = ${{ matrix.part }} * chunk
-end = min(( ${{ matrix.part }} + 1 ) * chunk, total)
-df.iloc[start:end].to_csv('monitor_list_part.csv', index=False, encoding='utf-8-sig')
-"
+        chromedriver --version
+        google-chrome --version
 
-          python monitor_spec_crawler.py monitor_list_part.csv monitor_spec_part_${{ matrix.part }}.csv
+    - name: Install Python dependencies
+      run: pip install selenium pandas
 
-      - name: Upload part result
-        uses: actions/upload-artifact@v3
-        with:
-          name: part-result-${{ matrix.part }}
-          path: monitor_spec_part_${{ matrix.part }}.csv
+    - name: Run monitor list crawler
+      run: python monitor_crawler_batch.py
 
-  merge-and-commit:
-    needs: split-spec-crawlers
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - name: Run monitor spec crawler
+      run: python monitor_spec_crawler.py
 
-      - name: Download all parts
-        uses: actions/download-artifact@v3
-        with:
-          path: parts
-
-      - name: Merge CSVs
-        run: |
-          pip install pandas
-          python -c "
-import pandas as pd
-import glob
-
-files = glob.glob('parts/**/monitor_spec_part_*.csv', recursive=True)
-dfs = [pd.read_csv(f, encoding='utf-8-sig') for f in files]
-merged = pd.concat(dfs)
-merged.to_csv('monitor_spec_list.csv', index=False, encoding='utf-8-sig')
-"
-
-      - name: Commit and push merged result
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: |
-          git config --global user.name "kwondohoon1"
-          git config --global user.email "kwondohoon1@naver.com"
-          git pull origin main || true
-          git add monitor_spec_list.csv
-          git commit -m "📊 monitor_spec_list.csv 병합 완료" || echo "변경 없음"
-          git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/kwondohoon1/danawa-monitor-crawler.git
-          git push origin main || echo "❌ Push 실패"
+    - name: Commit and push result CSVs
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      run: |
+        git config --global user.name "kwondohoon1"
+        git config --global user.email "kwondohoon1@naver.com"
+        git pull origin main || true
+        git add monitor_list.csv monitor_spec_list.csv
+        git commit -m "📊 모니터 리스트 및 스펙 자동 업데이트" || echo "✅ 변경 없음"
+        git remote set-url origin https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/kwondohoon1/danawa-monitor-crawler.git
+        git push origin main || echo "❌ Push 실패"
