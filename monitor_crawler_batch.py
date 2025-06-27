@@ -1,107 +1,112 @@
-import os
-import csv
 import time
+import csv
 import pandas as pd
-from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# 설정값
-DATA_FILE = 'monitor_price_list.csv'
-TARGET_URL = 'https://prod.danawa.com/list/?cate=112757'
-TODAY = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+def setup_driver():
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--window-size=1920,1080')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--no-sandbox')
+    driver = webdriver.Chrome(options=options)
+    driver.implicitly_wait(3)
+    return driver
 
-# 크롬 드라이버 옵션 설정
-options = Options()
-options.add_argument('--headless')
-options.add_argument('--disable-gpu')
-options.add_argument('--no-sandbox')
-options.add_argument('--window-size=1920,1080')
-
-driver = webdriver.Chrome(options=options)
-wait = WebDriverWait(driver, 10)
-
-# 상품 ID, 모델명, 가격 수집
-def collect_monitor_data():
-    driver.get(TARGET_URL)
-    time.sleep(2)
-
-    driver.find_element(By.XPATH, '//option[@value="90"]').click()
+def get_products(driver):
+    wait = WebDriverWait(driver, 10)
+    wait.until(EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover')))
     time.sleep(1)
 
-    product_map = {}
-    visited_ids = set()
-    tab_keys = ["BEST", "NEW"]
+    products = driver.find_elements(By.XPATH, '//ul[@class="product_list"]/li')
+    result = []
 
-    for tab in tab_keys:
+    for product in products:
         try:
-            driver.find_element(By.XPATH, f'//li[@data-sort-method="{tab}"]').click()
-            time.sleep(2)
+            pid = product.get_attribute("id")
+            if not pid or "ad" in pid:
+                continue
+            product_id = pid.replace("productItem", "")
+            model_name = product.find_element(By.XPATH, './div/div[2]/p/a').text.strip()
+
+            # 가격 파싱
+            price = "가격없음"
+            try:
+                price = product.find_element(By.CSS_SELECTOR, 'p.price_sect strong').text.replace(",", "").strip()
+            except:
+                try:
+                    price = product.find_element(By.CSS_SELECTOR, 'ul > li.mall_list_item > a > p.price_sect > strong').text.replace(",", "").strip()
+                except:
+                    pass
+
+            result.append({
+                "상품코드": product_id,
+                "모델명": model_name,
+                "가격": price
+            })
         except:
             continue
 
-        for page in range(1, 15):  # 최대 14페이지까지 반복
-            print(f"🔍 {tab}탭 - {page}페이지 수집 중...")
-            time.sleep(1)
-            products = driver.find_elements(By.XPATH, '//ul[@class="product_list"]/li')
+    return result
 
-            for product in products:
-                pid = product.get_attribute("id")
-                if not pid or "ad" in pid or not pid.startswith("productItem"):
-                    continue
-                pid = pid.replace("productItem", "")
-                if pid in visited_ids:
-                    continue
+def crawl_monitor_list(crawling_url, max_page=150):
+    driver = setup_driver()
+    driver.get(crawling_url)
+    time.sleep(2)
 
+    try:
+        driver.find_element(By.XPATH, '//option[@value="90"]').click()
+    except:
+        print("❌ '90개 보기' 클릭 실패")
+
+    total_results = []
+    seen_ids = set()
+
+    # 탭별로 크롤링
+    for tab_name, tab_xpath in [("NEW", '//li[@data-sort-method="NEW"]'), ("BEST", '//li[@data-sort-method="BEST"]')]:
+        try:
+            driver.find_element(By.XPATH, tab_xpath).click()
+            time.sleep(2)
+
+            for page in range(1, max_page + 1):
+                print(f"[{tab_name}] 📄 {page}페이지 크롤링 중...")
+
+                products = get_products(driver)
+
+                new_count = 0
+                for item in products:
+                    if item['상품코드'] not in seen_ids:
+                        total_results.append(item)
+                        seen_ids.add(item['상품코드'])
+                        new_count += 1
+
+                if new_count == 0:
+                    print(f"🔚 [{tab_name}] 중복 상품으로 중단")
+                    break
+
+                # 페이지 이동
                 try:
-                    name = product.find_element(By.XPATH, './div/div[2]/p/a').text.strip()
-                    price = product.find_element(By.CSS_SELECTOR, 'p.price_sect strong').text.replace(",", "").strip()
-                    visited_ids.add(pid)
-                    product_map[pid] = {"Name": name, "Price": price}
+                    if page % 10 == 0:
+                        driver.find_element(By.XPATH, '//a[@class="edge_nav nav_next"]').click()
+                    else:
+                        driver.find_element(By.XPATH, f'//a[@class="num "][{page % 10}]').click()
                 except:
-                    continue
+                    print(f"🔚 [{tab_name}] 다음 페이지 없음")
+                    break
+        except Exception as e:
+            print(f"❌ [{tab_name}] 탭 클릭 실패: {e}")
+            continue
 
-            try:
-                if page % 10 == 0:
-                    driver.find_element(By.CSS_SELECTOR, 'a.edge_nav.nav_next').click()
-                else:
-                    driver.find_element(By.XPATH, f'//a[@class="num "][text()="{(page%10)+1}"]').click()
-            except:
-                break
-
-    return product_map
-
-# CSV 파일 업데이트
-def update_csv(product_map):
-    if os.path.exists(DATA_FILE):
-        df = pd.read_csv(DATA_FILE)
-    else:
-        df = pd.DataFrame(columns=["Id", "Name"])
-
-    if TODAY not in df.columns:
-        df[TODAY] = 0
-
-    existing_ids = set(df["Id"].astype(str))
-    for pid, info in product_map.items():
-        if pid in existing_ids:
-            df.loc[df["Id"] == pid, TODAY] = info["Price"]
-        else:
-            new_row = {"Id": pid, "Name": info["Name"], TODAY: info["Price"]}
-            for col in df.columns:
-                if col not in new_row:
-                    new_row[col] = 0
-            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-
-    df = df.sort_values(by="Name")
-    df.to_csv(DATA_FILE, index=False, encoding="utf-8-sig")
-    print(f"✅ {DATA_FILE} 저장 완료")
-
-# 실행
-if __name__ == "__main__":
-    print("🚀 모니터 가격 수집 시작")
-    result = collect_monitor_data()
     driver.quit()
-    update_csv(result)
+
+    df = pd.DataFrame(total_results)
+    df.to_csv("monitor_list.csv", index=False, encoding="utf-8-sig")
+    print(f"✅ monitor_list.csv 저장 완료 - 총 {len(df)}개")
+
+if __name__ == "__main__":
+    url = "https://prod.danawa.com/list/?cate=112757"
+    crawl_monitor_list(url)
