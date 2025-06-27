@@ -7,7 +7,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-def crawl_monitor_list(crawling_url, max_page=40):
+def crawl_monitor_list(crawling_url, max_page=45):
     options = Options()
     options.add_argument('--headless')
     options.add_argument('--window-size=1920,1080')
