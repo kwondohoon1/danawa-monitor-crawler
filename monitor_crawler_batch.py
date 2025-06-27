@@ -19,7 +19,7 @@ def crawl_monitor_list(crawling_url, max_page=100):
     driver.get(crawling_url)
     time.sleep(2)
 
-    # 90개 보기 선택
+    # 90개씩 보기
     try:
         view_90 = driver.find_element(By.XPATH, '//option[@value="90"]')
         driver.execute_script("arguments[0].selected = true; arguments[0].dispatchEvent(new Event('change'))", view_90)
@@ -30,8 +30,8 @@ def crawl_monitor_list(crawling_url, max_page=100):
 
     results = []
     seen_ids = set()
-
     current_page = 1
+
     while current_page <= max_page:
         print(f"📄 {current_page}페이지 크롤링 중...")
 
@@ -68,23 +68,25 @@ def crawl_monitor_list(crawling_url, max_page=100):
                     "모델명": model_name,
                     "가격": price
                 })
-            except Exception as e:
-                print(f"❌ 제품 처리 실패: {e}")
+            except:
                 continue
 
-        # 다음 페이지로 이동
+        # 다음 페이지 이동
         try:
-            next_btn = driver.find_element(By.XPATH, '//a[@class="edge_nav nav_next"]')
-            if "disabled" in next_btn.get_attribute("class"):
-                print("🔚 마지막 페이지 도달")
-                break
-            else:
+            if current_page % 10 == 0:
+                next_btn = driver.find_element(By.XPATH, '//a[@class="edge_nav nav_next"]')
                 driver.execute_script("arguments[0].click()", next_btn)
-                time.sleep(2)
-                wait.until(EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover')))
-                current_page += 1
+            else:
+                num_buttons = driver.find_elements(By.XPATH, '//a[@class="num "]')
+                for btn in num_buttons:
+                    if btn.text.strip() == str((current_page % 10) + 1 if current_page % 10 != 0 else 1):
+                        driver.execute_script("arguments[0].click()", btn)
+                        break
+            time.sleep(2)
+            wait.until(EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover')))
+            current_page += 1
         except:
-            print("❌ 다음 페이지 클릭 실패")
+            print("🔚 마지막 페이지 또는 다음 페이지 클릭 실패")
             break
 
     driver.quit()
