@@ -1,5 +1,4 @@
 import time
-import csv
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -7,7 +6,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-def crawl_monitor_list(crawling_url, max_page=60):
+def crawl_monitor_list(crawling_url, max_page=100):
     options = Options()
     options.add_argument('--headless')
     options.add_argument('--window-size=1920,1080')
@@ -15,40 +14,46 @@ def crawl_monitor_list(crawling_url, max_page=60):
     options.add_argument('--no-sandbox')
 
     driver = webdriver.Chrome(options=options)
-    wait = WebDriverWait(driver, 10)
+    wait = WebDriverWait(driver, 15)
 
     driver.get(crawling_url)
     time.sleep(2)
 
-    driver.find_element(By.XPATH, '//option[@value="90"]').click()
-    wait.until(EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover')))
+    # 90개 보기 선택
+    try:
+        view_90 = driver.find_element(By.XPATH, '//option[@value="90"]')
+        driver.execute_script("arguments[0].selected = true; arguments[0].dispatchEvent(new Event('change'))", view_90)
+        time.sleep(2)
+        wait.until(EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover')))
+    except:
+        print("⚠️ 90개 보기 실패")
 
     results = []
-    seen_ids = set()  # 중복 방지를 위한 상품코드 집합
+    seen_ids = set()
 
-    for i in range(1, max_page + 1):
-        print(f"🔍 {i}페이지 크롤링 중...")
-        wait.until(EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover')))
-        time.sleep(1.5)
+    current_page = 1
+    while current_page <= max_page:
+        print(f"📄 {current_page}페이지 크롤링 중...")
+
+        try:
+            wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'product_list')))
+        except:
+            print("❌ 제품 리스트 로딩 실패")
+            break
 
         products = driver.find_elements(By.XPATH, '//ul[@class="product_list"]/li')
 
         for product in products:
             try:
-                product_raw_id = product.get_attribute("id")
-                if not product_raw_id or "ad" in product_raw_id:
+                pid = product.get_attribute("id")
+                if not pid or "ad" in pid:
                     continue
-
-                product_id = product_raw_id.replace("productItem", "")
-
-                # 이미 수집된 제품이면 스킵
-                if product_id in seen_ids:
+                pid = pid.replace("productItem", "")
+                if pid in seen_ids:
                     continue
-                seen_ids.add(product_id)
+                seen_ids.add(pid)
 
                 model_name = product.find_element(By.XPATH, './div/div[2]/p/a').text.strip()
-
-                # 가격 파싱 시도 (2가지 구조 대응)
                 price = "가격없음"
                 try:
                     price = product.find_element(By.CSS_SELECTOR, 'p.price_sect strong').text.replace(",", "").strip()
@@ -59,31 +64,34 @@ def crawl_monitor_list(crawling_url, max_page=60):
                         pass
 
                 results.append({
-                    "상품코드": product_id,
+                    "상품코드": pid,
                     "모델명": model_name,
                     "가격": price
                 })
-            except:
+            except Exception as e:
+                print(f"❌ 제품 처리 실패: {e}")
                 continue
 
-        # 페이지 이동
+        # 다음 페이지로 이동
         try:
-            if i % 10 == 0:
-                driver.find_element(By.XPATH, '//a[@class="edge_nav nav_next"]').click()
+            next_btn = driver.find_element(By.XPATH, '//a[@class="edge_nav nav_next"]')
+            if "disabled" in next_btn.get_attribute("class"):
+                print("🔚 마지막 페이지 도달")
+                break
             else:
-                # 페이지 번호는 1~10 사이만 존재하므로 예외 처리
-                page_index = i % 10 if i % 10 != 0 else 10
-                driver.find_element(By.XPATH, f'(//a[@class="num " or @class="num on"])[{page_index}]').click()
+                driver.execute_script("arguments[0].click()", next_btn)
+                time.sleep(2)
+                wait.until(EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover')))
+                current_page += 1
         except:
-            print("🔚 다음 페이지 없음")
+            print("❌ 다음 페이지 클릭 실패")
             break
 
     driver.quit()
-
     df = pd.DataFrame(results)
-    df.drop_duplicates(subset=["상품코드"], inplace=True)  # 혹시라도 중복된 것 제거
+    df.drop_duplicates(subset=["상품코드"], inplace=True)
     df.to_csv("monitor_list.csv", index=False, encoding="utf-8-sig")
-    print(f"✅ monitor_list.csv 저장 완료 - 총 {len(df)}개 제품")
+    print(f"✅ 총 {len(df)}개 제품 저장 완료")
 
 if __name__ == "__main__":
     url = "https://prod.danawa.com/list/?cate=112757"
