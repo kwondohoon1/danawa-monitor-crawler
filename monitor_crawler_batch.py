@@ -1,5 +1,4 @@
 import time
-import csv
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -48,25 +47,12 @@ def get_products(driver):
             product_id = pid.replace("productItem", "")
             model_name = product.find_element(By.XPATH, './div/div[2]/p/a').text.strip()
 
-            # 가격 파싱
+            # 대표 가격만 추출
             price = "가격없음"
-            price_area = product.find_elements(By.CSS_SELECTOR, 'ul > li.mall_list_item')
-            price_list = []
-
-            if price_area:
-                for item in price_area:
-                    try:
-                        mall = item.find_element(By.CSS_SELECTOR, 'div > a > div.mall_name').text.strip()
-                        val = item.find_element(By.CSS_SELECTOR, 'div > a > div.price_sect > em').text.strip().replace(",", "")
-                        price_list.append(f"{mall}:{val}")
-                    except:
-                        continue
-                price = " | ".join(price_list) if price_list else "가격없음"
-            else:
-                try:
-                    price = product.find_element(By.CSS_SELECTOR, 'p.price_sect strong').text.replace(",", "").strip()
-                except:
-                    pass
+            try:
+                price = product.find_element(By.CSS_SELECTOR, 'p.price_sect strong').text.replace(",", "").strip()
+            except:
+                pass
 
             result.append({
                 "상품코드": product_id,
@@ -95,7 +81,6 @@ def go_to_page(driver, page_number):
                 driver.execute_script("arguments[0].click();", p)
                 wait_for_list_ready(driver)
                 return
-        # 페이지 번호가 없으면 다음 블럭으로 넘기기
         driver.find_element(By.CSS_SELECTOR, 'div.number_wrap a.edge_nav.nav_next').click()
         wait_for_list_ready(driver)
         go_to_page(driver, page_number)
