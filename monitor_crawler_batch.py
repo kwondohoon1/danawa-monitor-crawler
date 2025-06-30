@@ -18,25 +18,22 @@ def setup_driver():
     driver.implicitly_wait(3)
     return driver
 
-def click_element_when_ready(driver, by, value, timeout=15):
-    try:
-        WebDriverWait(driver, timeout).until(
-            EC.element_to_be_clickable((by, value))
-        )
-        WebDriverWait(driver, timeout).until(
-            EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover'))
-        )
-        element = driver.find_element(by, value)
-        driver.execute_script("arguments[0].click();", element)
-        time.sleep(1.5)
-    except Exception as e:
-        print(f"❌ 클릭 실패: {value} - {e}")
-
-def get_products(driver):
-    wait = WebDriverWait(driver, 10)
-    wait.until(EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover')))
+def wait_for_list_ready(driver):
+    WebDriverWait(driver, 10).until(
+        EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover'))
+    )
     time.sleep(1)
 
+def get_total_pages(driver):
+    try:
+        pages = driver.find_elements(By.CSS_SELECTOR, 'div.number_wrap a.num')
+        page_numbers = [int(p.text.strip()) for p in pages if p.text.strip().isdigit()]
+        return max(page_numbers) if page_numbers else 1
+    except:
+        return 1
+
+def get_products(driver):
+    wait_for_list_ready(driver)
     products = driver.find_elements(By.XPATH, '//ul[@class="product_list"]/li')
     result = []
 
@@ -81,51 +78,63 @@ def get_products(driver):
 
     return result
 
-def crawl_monitor_list(crawling_url, max_page=25):
+def go_to_page(driver, page_number):
+    try:
+        current_page_el = driver.find_element(By.CSS_SELECTOR, 'div.number_wrap a.num.on')
+        current_page = int(current_page_el.text.strip())
+    except:
+        current_page = -1
+
+    if page_number == current_page:
+        return
+
+    try:
+        pages = driver.find_elements(By.CSS_SELECTOR, 'div.number_wrap a.num')
+        for p in pages:
+            if p.text.strip() == str(page_number):
+                driver.execute_script("arguments[0].click();", p)
+                wait_for_list_ready(driver)
+                return
+        # 페이지 번호가 없으면 다음 블럭으로 넘기기
+        driver.find_element(By.CSS_SELECTOR, 'div.number_wrap a.edge_nav.nav_next').click()
+        wait_for_list_ready(driver)
+        go_to_page(driver, page_number)
+    except:
+        pass
+
+def crawl_monitor_list_all(url):
     driver = setup_driver()
-    driver.get(crawling_url)
+    driver.get(url)
     time.sleep(2)
 
     try:
-        click_element_when_ready(driver, By.XPATH, '//option[@value="90"]')
+        driver.find_element(By.XPATH, '//option[@value="90"]').click()
+        wait_for_list_ready(driver)
     except:
         print("❌ '90개 보기' 클릭 실패")
 
-    total_results = []
     seen_ids = set()
+    total_results = []
 
-    # 탭별로 크롤링
-    for tab_name, tab_xpath in [("NEW", '//li[@data-sort-method="NEW"]'), ("BEST", '//li[@data-sort-method="BEST"]')]:
-        try:
-            click_element_when_ready(driver, By.XPATH, tab_xpath)
+    total_pages = get_total_pages(driver)
+    print(f"📌 전체 페이지 수: {total_pages}")
 
-            for page in range(1, max_page + 1):
-                print(f"[{tab_name}] 📄 {page}페이지 크롤링 중...")
+    for page in range(1, total_pages + 1):
+        print(f"📄 {page}페이지 크롤링 중...")
 
-                products = get_products(driver)
+        go_to_page(driver, page)
+        products = get_products(driver)
 
-                new_count = 0
-                for item in products:
-                    if item['상품코드'] not in seen_ids:
-                        total_results.append(item)
-                        seen_ids.add(item['상품코드'])
-                        new_count += 1
+        new_count = 0
+        for item in products:
+            if item['상품코드'] not in seen_ids:
+                total_results.append(item)
+                seen_ids.add(item['상품코드'])
+                new_count += 1
 
-                if new_count == 0:
-                    print(f"🔚 [{tab_name}] 중복 상품으로 중단")
-                    break
-
-                try:
-                    if page % 10 == 0:
-                        click_element_when_ready(driver, By.XPATH, '//a[@class="edge_nav nav_next"]')
-                    else:
-                        click_element_when_ready(driver, By.XPATH, f'//a[@class="num "][{page % 10}]')
-                except:
-                    print(f"🔚 [{tab_name}] 다음 페이지 없음")
-                    break
-        except Exception as e:
-            print(f"❌ [{tab_name}] 탭 클릭 실패: {e}")
-            continue
+        if new_count == 0:
+            print(f"🔚 더 이상 신규 상품 없음, 중단")
+            break
 
     driver.quit()
 
@@ -135,4 +144,4 @@ def crawl_monitor_list(crawling_url, max_page=25):
 
 if __name__ == "__main__":
     url = "https://prod.danawa.com/list/?cate=112757"
-    crawl_monitor_list(url)
+    crawl_monitor_list_all(url)
