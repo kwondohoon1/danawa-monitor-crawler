@@ -4,27 +4,24 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service  # ✅ 추가
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
 from datetime import datetime, timedelta
 from pytz import timezone
 import csv
 import os
-import os.path
 import shutil
 import traceback
 
 from multiprocessing import Pool
 
-# 설정
 PROCESS_COUNT = 1
 CRAWLING_DATA_CSV_FILE = 'CrawlingCategory.csv'
 DATA_PATH = 'crawl_data'
 DATA_REFRESH_PATH = f'{DATA_PATH}/Last_Data'
-CHROMEDRIVER_PATH = 'chromedriver'
 TIMEZONE = 'Asia/Seoul'
 
-# 구분자
 DATA_REMARK = '//'
 DATA_ROW_DIVIDER = '_'
 DATA_PRODUCT_DIVIDER = '|'
@@ -82,7 +79,7 @@ class DanawaMonitorCrawler:
                 chrome_option.add_argument('--disable-gpu')
                 chrome_option.add_argument('lang=ko_KR')
 
-                service = Service(CHROMEDRIVER_PATH)  # ✅ 변경된 부분
+                service = Service(ChromeDriverManager().install())
                 browser = webdriver.Chrome(service=service, options=chrome_option)
 
                 browser.get(url)
@@ -181,7 +178,7 @@ class DanawaMonitorCrawler:
             if not data_rows:
                 data_rows.append(['Id', 'Name'])
 
-            data_rows[0].append(rows[0][0])  # 날짜
+            data_rows[0].append(rows[0][0])
 
             for row in rows[1:]:
                 if not row[0].isdigit():
@@ -209,12 +206,11 @@ class DanawaMonitorCrawler:
 
             os.remove(temp_path)
 
-            # ✅ monitor_list.csv 저장 (Id, Name, Price)
             list_path = 'monitor_list.csv'
             with open(list_path, 'w', newline='', encoding='utf-8') as listfile:
                 writer = csv.writer(listfile)
                 writer.writerow(['Id', 'Name', 'Price'])
-                for row in data_rows[1:]:  # 헤더 제외
+                for row in data_rows[1:]:
                     latest_price = row[-1]
                     writer.writerow([row[0], row[1], latest_price])
 
