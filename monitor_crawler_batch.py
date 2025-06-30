@@ -4,6 +4,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.service import Service  # ✅ 추가
 
 from datetime import datetime, timedelta
 from pytz import timezone
@@ -81,7 +82,9 @@ class DanawaMonitorCrawler:
                 chrome_option.add_argument('--disable-gpu')
                 chrome_option.add_argument('lang=ko_KR')
 
-                browser = webdriver.Chrome(executable_path=CHROMEDRIVER_PATH, options=chrome_option)
+                service = Service(CHROMEDRIVER_PATH)  # ✅ 변경된 부분
+                browser = webdriver.Chrome(service=service, options=chrome_option)
+
                 browser.get(url)
                 WebDriverWait(browser, 5).until(
                     EC.element_to_be_clickable((By.XPATH, '//option[@value="90"]'))
@@ -206,7 +209,7 @@ class DanawaMonitorCrawler:
 
             os.remove(temp_path)
 
-            # ✅ monitor_list.csv 생성 (Id, Name, Price)
+            # ✅ monitor_list.csv 저장 (Id, Name, Price)
             list_path = 'monitor_list.csv'
             with open(list_path, 'w', newline='', encoding='utf-8') as listfile:
                 writer = csv.writer(listfile)
