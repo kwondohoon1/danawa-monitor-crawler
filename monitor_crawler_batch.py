@@ -74,37 +74,46 @@ class DanawaMonitorCrawler:
                 collected = OrderedDict()
                 for sort_method in ['NEW', 'BEST']:
                     browser.get(url)
-                    WebDriverWait(browser, 5).until(EC.presence_of_element_located((By.XPATH, f'//li[@data-sort-method="{sort_method}"]'))).click()
-                    time.sleep(1)
+                    WebDriverWait(browser, 10).until(
+                        EC.presence_of_element_located((By.XPATH, f'//li[@data-sort-method="{sort_method}"]'))
+                    ).click()
+                    time.sleep(2)
 
                     for page in range(1, page_size + 1):
                         print(f"  Sort: {sort_method}, Page: {page}")
-                        WebDriverWait(browser, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'product_list')))
-                        products = browser.find_elements(By.XPATH, '//ul[@class="product_list"]/li')
-                        for product in products:
-                            pid = product.get_attribute('id')
-                            if not pid or pid.startswith('ad') or 'prod_ad_item' in product.get_attribute('class'):
-                                continue
 
-                            productId = pid[11:]
-                            if productId in collected:
-                                continue
+                        WebDriverWait(browser, 10).until(
+                            EC.presence_of_element_located((By.CLASS_NAME, 'product_list'))
+                        )
+                        time.sleep(1)
 
+                        li_xpath = '//ul[@class="product_list"]/li[not(contains(@id, "ad")) and not(contains(@class, "prod_ad_item"))]'
+                        li_elements = browser.find_elements(By.XPATH, li_xpath)
+
+                        for li in li_elements:
                             try:
-                                productName = product.find_element(By.XPATH, './div/div[2]/p/a').text.strip()
-                                productPrices = product.find_elements(By.XPATH, './div/div[3]/ul/li')
+                                pid = li.get_attribute('id')
+                                if not pid or not pid.startswith('productItem_'):
+                                    continue
+
+                                productId = pid[11:]
+                                if productId in collected:
+                                    continue
+
+                                productName = li.find_element(By.XPATH, './div/div[2]/p/a').text.strip()
+                                price_blocks = li.find_elements(By.XPATH, './div/div[3]/ul/li')
                                 priceStr = ''
 
-                                for priceBlock in productPrices:
-                                    if 'top5_button' in priceBlock.get_attribute('class'):
+                                for block in price_blocks:
+                                    if 'top5_button' in block.get_attribute('class'):
                                         continue
-                                    if priceStr:
-                                        priceStr += DATA_PRODUCT_DIVIDER
                                     try:
-                                        mall = priceBlock.find_element(By.XPATH, './a/div[1]').text.strip()
+                                        mall = block.find_element(By.XPATH, './a/div[1]').text.strip()
                                         if not mall:
-                                            mall = priceBlock.find_element(By.XPATH, './a/div[1]/span[1]').text.strip()
-                                        price = priceBlock.find_element(By.XPATH, './a/div[2]/em').text.strip()
+                                            mall = block.find_element(By.XPATH, './a/div[1]/span[1]').text.strip()
+                                        price = block.find_element(By.XPATH, './a/div[2]/em').text.strip()
+                                        if priceStr:
+                                            priceStr += DATA_PRODUCT_DIVIDER
                                         priceStr += f'{mall}{DATA_ROW_DIVIDER}{price}'
                                     except:
                                         continue
@@ -113,18 +122,18 @@ class DanawaMonitorCrawler:
                             except:
                                 continue
 
-                        # 다음 페이지 이동
                         try:
+                            pagination = browser.find_elements(By.XPATH, '//div[@class="number_wrap"]/a')
                             next_btn = browser.find_element(By.XPATH, '//a[@class="edge_nav nav_next"]')
                             if 'disable' in next_btn.get_attribute('class'):
                                 break
                             next_btn.click()
-                            time.sleep(1)
+                            time.sleep(2)
                         except:
                             break
 
-                for pid, (name, prices) in collected.items():
-                    writer.writerow([pid, name, prices])
+                for pid, (pname, price) in collected.items():
+                    writer.writerow([pid, pname, price])
 
             except Exception:
                 print(f'Error - {name}')
