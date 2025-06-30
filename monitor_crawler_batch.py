@@ -1,120 +1,112 @@
+import time
+import csv
+import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-from datetime import datetime
-from pytz import timezone
-import csv
-import os
-import traceback
+def setup_driver():
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--window-size=1920,1080')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--no-sandbox')
+    driver = webdriver.Chrome(options=options)
+    driver.implicitly_wait(3)
+    return driver
 
-# 설정
-CHROMEDRIVER_PATH = 'chromedriver'
-DATA_PATH = 'crawl_data'
-TIMEZONE = 'Asia/Seoul'
+def get_products(driver):
+    wait = WebDriverWait(driver, 10)
+    wait.until(EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover')))
+    time.sleep(1)
 
-CATEGORY_NAME = 'Monitor'
-CATEGORY_URL = 'https://prod.danawa.com/list/?cate=112757'
+    products = driver.find_elements(By.XPATH, '//ul[@class="product_list"]/li')
+    result = []
 
-class DanawaMonitorCrawler:
-    def __init__(self):
-        self.errorList = []
-        self.chrome_option = webdriver.ChromeOptions()
-        self.chrome_option.add_argument('--headless')
-        self.chrome_option.add_argument('--window-size=1920,1080')
-        self.chrome_option.add_argument('--disable-gpu')
-        self.chrome_option.add_argument('lang=ko_KR')
-
-    def GetCurrentDate(self):
-        return datetime.now(timezone(TIMEZONE))
-
-    def Crawl(self):
-        print(f'Crawling Start: {CATEGORY_NAME}')
-        seen_ids = set()
-        all_data = []
-        browser = None  # 브라우저 초기화
-
+    for product in products:
         try:
-            browser = webdriver.Chrome(executable_path=CHROMEDRIVER_PATH, options=self.chrome_option)
-            browser.implicitly_wait(5)
-            browser.get(CATEGORY_URL)
+            pid = product.get_attribute("id")
+            if not pid or "ad" in pid:
+                continue
+            product_id = pid.replace("productItem", "")
+            model_name = product.find_element(By.XPATH, './div/div[2]/p/a').text.strip()
 
-            # 90개 보기 설정
+            # 가격 파싱
+            price = "가격없음"
             try:
-                browser.find_element(By.XPATH, '//option[@value="90"]').click()
-                WebDriverWait(browser, 10).until(
-                    EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover'))
-                )
+                price = product.find_element(By.CSS_SELECTOR, 'p.price_sect strong').text.replace(",", "").strip()
             except:
-                print("❌ 90개 보기 설정 실패")
-
-            sort_methods = ["NEW", "BEST", "DATE", "LOW_PRICE"]
-            for method in sort_methods:
                 try:
-                    tab = browser.find_element(By.XPATH, f'//li[@data-sort-method="{method}"]')
-                    browser.execute_script("arguments[0].click();", tab)
-                    WebDriverWait(browser, 10).until(
-                        EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover'))
-                    )
+                    price = product.find_element(By.CSS_SELECTOR, 'ul > li.mall_list_item > a > p.price_sect > strong').text.replace(",", "").strip()
                 except:
-                    print(f"❌ 정렬 기준 {method} 클릭 실패")
-                    continue
+                    pass
 
-                while True:
-                    try:
-                        product_items = browser.find_elements(By.CSS_SELECTOR, 'ul.product_list > li')
-                        for product in product_items:
-                            pid = product.get_attribute('id')
-                            if not pid or 'ad' in pid or 'prod_ad_item' in product.get_attribute('class'):
-                                continue
-                            pid = pid.replace("productItem", "")
-                            if pid in seen_ids:
-                                continue
+            result.append({
+                "상품코드": product_id,
+                "모델명": model_name,
+                "가격": price
+            })
+        except:
+            continue
 
-                            name = product.find_element(By.CSS_SELECTOR, 'div.prod_info p.prod_name a').text.strip()
-                            try:
-                                price = product.find_element(By.CSS_SELECTOR, 'p.price_sect strong').text.strip().replace(",", "")
-                            except:
-                                price = "가격없음"
+    return result
 
-                            all_data.append([pid, name, price])
-                            seen_ids.add(pid)
-                    except Exception as e:
-                        print(f"❗ 상품 파싱 오류: {e}")
-                        continue
+def crawl_monitor_list(crawling_url, max_page=150):
+    driver = setup_driver()
+    driver.get(crawling_url)
+    time.sleep(2)
 
-                    # 다음 페이지
-                    try:
-                        next_btn = browser.find_element(By.CSS_SELECTOR, 'a.edge_nav.nav_next')
-                        if 'disable' in next_btn.get_attribute('class'):
-                            break
-                        browser.execute_script("arguments[0].click();", next_btn)
-                        WebDriverWait(browser, 10).until(
-                            EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover'))
-                        )
-                    except:
-                        break
+    try:
+        driver.find_element(By.XPATH, '//option[@value="90"]').click()
+    except:
+        print("❌ '90개 보기' 클릭 실패")
 
-        except Exception:
-            print(traceback.format_exc())
-            self.errorList.append(CATEGORY_NAME)
+    total_results = []
+    seen_ids = set()
 
-        finally:
-            if browser:
-                browser.quit()
+    # 탭별로 크롤링
+    for tab_name, tab_xpath in [("NEW", '//li[@data-sort-method="NEW"]'), ("BEST", '//li[@data-sort-method="BEST"]')]:
+        try:
+            driver.find_element(By.XPATH, tab_xpath).click()
+            time.sleep(2)
 
-        # 저장
-        os.makedirs(DATA_PATH, exist_ok=True)
-        output_path = os.path.join(DATA_PATH, f'{CATEGORY_NAME}.csv')
-        with open(output_path, 'w', newline='', encoding='utf8') as f:
-            writer = csv.writer(f)
-            writer.writerow([self.GetCurrentDate().strftime('%Y-%m-%d %H:%M:%S')])
-            for row in all_data:
-                writer.writerow(row)
+            for page in range(1, max_page + 1):
+                print(f"[{tab_name}] 📄 {page}페이지 크롤링 중...")
 
-        print(f'Crawling Finish: {CATEGORY_NAME} | 총 수집: {len(all_data)}개')
+                products = get_products(driver)
 
-if __name__ == '__main__':
-    crawler = DanawaMonitorCrawler()
-    crawler.Crawl()
+                new_count = 0
+                for item in products:
+                    if item['상품코드'] not in seen_ids:
+                        total_results.append(item)
+                        seen_ids.add(item['상품코드'])
+                        new_count += 1
+
+                if new_count == 0:
+                    print(f"🔚 [{tab_name}] 중복 상품으로 중단")
+                    break
+
+                # 페이지 이동
+                try:
+                    if page % 10 == 0:
+                        driver.find_element(By.XPATH, '//a[@class="edge_nav nav_next"]').click()
+                    else:
+                        driver.find_element(By.XPATH, f'//a[@class="num "][{page % 10}]').click()
+                except:
+                    print(f"🔚 [{tab_name}] 다음 페이지 없음")
+                    break
+        except Exception as e:
+            print(f"❌ [{tab_name}] 탭 클릭 실패: {e}")
+            continue
+
+    driver.quit()
+
+    df = pd.DataFrame(total_results)
+    df.to_csv("monitor_list.csv", index=False, encoding="utf-8-sig")
+    print(f"✅ monitor_list.csv 저장 완료 - 총 {len(df)}개")
+
+if __name__ == "__main__":
+    url = "https://prod.danawa.com/list/?cate=112757"
+    crawl_monitor_list(url)
