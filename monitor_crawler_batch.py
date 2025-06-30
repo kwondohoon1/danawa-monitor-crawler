@@ -16,7 +16,7 @@ import traceback
 from multiprocessing import Pool
 
 # 설정
-PROCESS_COUNT = 2
+PROCESS_COUNT = 1
 CRAWLING_DATA_CSV_FILE = 'CrawlingCategory.csv'
 DATA_PATH = 'crawl_data'
 DATA_REFRESH_PATH = f'{DATA_PATH}/Last_Data'
@@ -75,7 +75,13 @@ class DanawaMonitorCrawler:
             writer.writerow([self.now().strftime('%Y-%m-%d %H:%M:%S')])
 
             try:
-                browser = webdriver.Chrome(CHROMEDRIVER_PATH, options=webdriver.ChromeOptions())
+                chrome_option = webdriver.ChromeOptions()
+                chrome_option.add_argument('--headless')
+                chrome_option.add_argument('--window-size=1920,1080')
+                chrome_option.add_argument('--disable-gpu')
+                chrome_option.add_argument('lang=ko_KR')
+
+                browser = webdriver.Chrome(executable_path=CHROMEDRIVER_PATH, options=chrome_option)
                 browser.get(url)
                 WebDriverWait(browser, 5).until(
                     EC.element_to_be_clickable((By.XPATH, '//option[@value="90"]'))
@@ -200,7 +206,7 @@ class DanawaMonitorCrawler:
 
             os.remove(temp_path)
 
-            # ✅ monitor_list.csv 업데이트
+            # ✅ monitor_list.csv 생성 (Id, Name, Price)
             list_path = 'monitor_list.csv'
             with open(list_path, 'w', newline='', encoding='utf-8') as listfile:
                 writer = csv.writer(listfile)
@@ -208,7 +214,6 @@ class DanawaMonitorCrawler:
                 for row in data_rows[1:]:  # 헤더 제외
                     latest_price = row[-1]
                     writer.writerow([row[0], row[1], latest_price])
-
 
     def refresh_data(self):
         today = self.now()
