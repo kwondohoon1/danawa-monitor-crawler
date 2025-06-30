@@ -1,3 +1,5 @@
+# monitor_crawler_batch.py
+
 import time
 import csv
 from selenium import webdriver
@@ -12,13 +14,10 @@ def setup_driver():
     options.add_argument('--window-size=1920,1080')
     options.add_argument('--disable-gpu')
     options.add_argument('--no-sandbox')
-    driver = webdriver.Chrome(options=options)
-    driver.implicitly_wait(3)
-    return driver
+    return webdriver.Chrome(options=options)
 
 def get_products(driver):
-    wait = WebDriverWait(driver, 10)
-    wait.until(EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover')))
+    WebDriverWait(driver, 10).until(EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover')))
     time.sleep(1)
 
     products = driver.find_elements(By.XPATH, '//ul[@class="product_list"]/li')
@@ -32,7 +31,6 @@ def get_products(driver):
             product_id = pid.replace("productItem", "")
             model_name = product.find_element(By.XPATH, './div/div[2]/p/a').text.strip()
 
-            # 가격 파싱
             price = "가격없음"
             try:
                 price = product.find_element(By.CSS_SELECTOR, 'p.price_sect strong').text.replace(",", "").strip()
@@ -52,9 +50,9 @@ def get_products(driver):
 
     return result
 
-def crawl_monitor_list(crawling_url, max_page=150):
+def crawl_monitor_list(url):
     driver = setup_driver()
-    driver.get(crawling_url)
+    driver.get(url)
     time.sleep(2)
 
     try:
@@ -62,43 +60,55 @@ def crawl_monitor_list(crawling_url, max_page=150):
     except:
         print("❌ '90개 보기' 클릭 실패")
 
-    total_results = []
+    all_products = []
     seen_ids = set()
 
-    for tab_name, tab_xpath in [("NEW", '//li[@data-sort-method="NEW"]'), ("BEST", '//li[@data-sort-method="BEST"]')]:
+    # 정렬 기준을 순차적으로 바꿔가며 크롤링
+    sort_methods = ['NEW', 'BEST', 'POPULAR', 'LOW_PRICE', 'HIGH_PRICE']
+    sort_labels = {
+        'NEW': '신상품순',
+        'BEST': '판매량순',
+        'POPULAR': '인기순',
+        'LOW_PRICE': '낮은가격순',
+        'HIGH_PRICE': '높은가격순',
+    }
+
+    for method in sort_methods:
         try:
-            driver.find_element(By.XPATH, tab_xpath).click()
+            print(f"\n🔄 정렬 기준: {sort_labels[method]}")
+
+            driver.find_element(By.XPATH, f'//li[@data-sort-method="{method}"]').click()
             time.sleep(2)
 
-            for page in range(1, max_page + 1):
-                print(f"[{tab_name}] 📄 {page}페이지 크롤링 중...")
+            for page in range(1, 11):  # 1~10페이지
+                print(f"📄 {method} - {page}페이지")
 
                 products = get_products(driver)
-
                 new_count = 0
                 for item in products:
                     if item['상품코드'] not in seen_ids:
-                        total_results.append(item)
                         seen_ids.add(item['상품코드'])
+                        all_products.append(item)
                         new_count += 1
 
                 if new_count == 0:
-                    print(f"🔚 [{tab_name}] 중복 상품으로 중단")
+                    print("🔚 중복 상품만 나와서 중단")
                     break
 
+                # 페이지 이동
                 try:
-                    pagination_buttons = driver.find_elements(By.CSS_SELECTOR, 'div.number_wrap a.num')
-                    for btn in pagination_buttons:
+                    next_buttons = driver.find_elements(By.CSS_SELECTOR, 'div.number_wrap a.num')
+                    for btn in next_buttons:
                         if btn.text == str(page + 1):
                             btn.click()
                             break
                     else:
-                        raise Exception("페이지 버튼 없음")
+                        break
                 except:
-                    print(f"🔚 [{tab_name}] 다음 페이지 없음")
                     break
+
         except Exception as e:
-            print(f"❌ [{tab_name}] 탭 클릭 실패: {e}")
+            print(f"❌ 정렬 {method} 실패: {e}")
             continue
 
     driver.quit()
@@ -106,11 +116,10 @@ def crawl_monitor_list(crawling_url, max_page=150):
     with open("monitor_list.csv", 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f)
         writer.writerow(['상품코드', '모델명', '가격'])
-        for row in sorted(total_results, key=lambda x: x['모델명']):
+        for row in sorted(all_products, key=lambda x: x['모델명']):
             writer.writerow([row['상품코드'], row['모델명'], row['가격']])
 
-    print(f"✅ monitor_list.csv 저장 완료 - 총 {len(total_results)}개")
+    print(f"\n✅ monitor_list.csv 저장 완료 - 총 {len(all_products)}개 수집됨")
 
 if __name__ == "__main__":
-    url = "https://prod.danawa.com/list/?cate=112757"
-    crawl_monitor_list(url)
+    crawl_monitor_list("https://prod.danawa.com/list/?cate=112757")
