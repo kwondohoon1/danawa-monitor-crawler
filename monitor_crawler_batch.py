@@ -33,9 +33,10 @@ class DanawaMonitorCrawler:
         print(f'Crawling Start: {CATEGORY_NAME}')
         seen_ids = set()
         all_data = []
+        browser = None  # 브라우저 초기화
 
         try:
-            browser = webdriver.Chrome(CHROMEDRIVER_PATH, options=self.chrome_option)
+            browser = webdriver.Chrome(executable_path=CHROMEDRIVER_PATH, options=self.chrome_option)
             browser.implicitly_wait(5)
             browser.get(CATEGORY_URL)
 
@@ -99,7 +100,9 @@ class DanawaMonitorCrawler:
             print(traceback.format_exc())
             self.errorList.append(CATEGORY_NAME)
 
-        browser.quit()
+        finally:
+            if browser:
+                browser.quit()
 
         # 저장
         os.makedirs(DATA_PATH, exist_ok=True)
