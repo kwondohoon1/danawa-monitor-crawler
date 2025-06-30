@@ -13,6 +13,7 @@ def setup_driver():
     options.add_argument('--window-size=1920,1080')
     options.add_argument('--disable-gpu')
     options.add_argument('--no-sandbox')
+    options.add_argument('lang=ko_KR')
     driver = webdriver.Chrome(options=options)
     driver.implicitly_wait(3)
     return driver
@@ -30,16 +31,29 @@ def get_products(driver):
             pid = product.get_attribute("id")
             if not pid or "ad" in pid:
                 continue
+            if 'prod_ad_item' in product.get_attribute('class'):
+                continue
+
             product_id = pid.replace("productItem", "")
             model_name = product.find_element(By.XPATH, './div/div[2]/p/a').text.strip()
 
             # 가격 파싱
             price = "가격없음"
-            try:
-                price = product.find_element(By.CSS_SELECTOR, 'p.price_sect strong').text.replace(",", "").strip()
-            except:
+            price_area = product.find_elements(By.CSS_SELECTOR, 'ul > li.mall_list_item')
+            price_list = []
+
+            if price_area:
+                for item in price_area:
+                    try:
+                        mall = item.find_element(By.CSS_SELECTOR, 'div > a > div.mall_name').text.strip()
+                        val = item.find_element(By.CSS_SELECTOR, 'div > a > div.price_sect > em').text.strip().replace(",", "")
+                        price_list.append(f"{mall}:{val}")
+                    except:
+                        continue
+                price = " | ".join(price_list) if price_list else "가격없음"
+            else:
                 try:
-                    price = product.find_element(By.CSS_SELECTOR, 'ul > li.mall_list_item > a > p.price_sect > strong').text.replace(",", "").strip()
+                    price = product.find_element(By.CSS_SELECTOR, 'p.price_sect strong').text.replace(",", "").strip()
                 except:
                     pass
 
@@ -53,7 +67,7 @@ def get_products(driver):
 
     return result
 
-def crawl_monitor_list(crawling_url, max_page=150):
+def crawl_monitor_list(crawling_url, max_page=25):
     driver = setup_driver()
     driver.get(crawling_url)
     time.sleep(2)
@@ -66,7 +80,6 @@ def crawl_monitor_list(crawling_url, max_page=150):
     total_results = []
     seen_ids = set()
 
-    # 탭별로 크롤링
     for tab_name, tab_xpath in [("NEW", '//li[@data-sort-method="NEW"]'), ("BEST", '//li[@data-sort-method="BEST"]')]:
         try:
             driver.find_element(By.XPATH, tab_xpath).click()
@@ -88,7 +101,6 @@ def crawl_monitor_list(crawling_url, max_page=150):
                     print(f"🔚 [{tab_name}] 중복 상품으로 중단")
                     break
 
-                # 페이지 이동
                 try:
                     if page % 10 == 0:
                         driver.find_element(By.XPATH, '//a[@class="edge_nav nav_next"]').click()
