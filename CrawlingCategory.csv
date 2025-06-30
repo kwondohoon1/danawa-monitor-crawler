@@ -1,0 +1,18 @@
+// Name, URL, Crawling Page Size
+CPU, "https://prod.danawa.com/list/?cate=112747", 4
+RAM, "https://prod.danawa.com/list/?cate=112752", 10
+VGA, "https://prod.danawa.com/list/?cate=112753", 10
+MBoard, "https://prod.danawa.com/list/?cate=112751", 10
+SSD, "https://prod.danawa.com/list/?cate=112760", 5
+HDD, "https://prod.danawa.com/list/?cate=112763", 3
+Power, "https://prod.danawa.com/list/?cate=112777", 10
+Cooler, "https://prod.danawa.com/list/?cate=11236855", 20
+Case, "https://prod.danawa.com/list/?cate=112775", 10
+Monitor, "https://prod.danawa.com/list/?cate=112757", 25
+Speaker, "https://prod.danawa.com/list/?cate=11252452", 20
+Headphone, "https://prod.danawa.com/list/?cate=11252453", 10
+Earphone, "https://prod.danawa.com/list/?cate=11252571", 30
+Headset, "https://prod.danawa.com/list/?cate=11252451", 5
+Keyboard, "https://prod.danawa.com/list/?cate=112782", 10
+Mouse, "https://prod.danawa.com/list/?cate=112787", 20
+Laptop, "https://prod.danawa.com/list/?cate=112758", 30
