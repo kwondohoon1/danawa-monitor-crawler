@@ -200,6 +200,16 @@ class DanawaMonitorCrawler:
 
             os.remove(temp_path)
 
+            # ✅ monitor_list.csv 업데이트
+            list_path = 'monitor_list.csv'
+            with open(list_path, 'w', newline='', encoding='utf-8') as listfile:
+                writer = csv.writer(listfile)
+                writer.writerow(['Id', 'Name', 'Price'])
+                for row in data_rows[1:]:  # 헤더 제외
+                    latest_price = row[-1]
+                    writer.writerow([row[0], row[1], latest_price])
+
+
     def refresh_data(self):
         today = self.now()
         if today.day != 1:
