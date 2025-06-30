@@ -18,6 +18,20 @@ def setup_driver():
     driver.implicitly_wait(3)
     return driver
 
+def click_element_when_ready(driver, by, value, timeout=15):
+    try:
+        WebDriverWait(driver, timeout).until(
+            EC.element_to_be_clickable((by, value))
+        )
+        WebDriverWait(driver, timeout).until(
+            EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover'))
+        )
+        element = driver.find_element(by, value)
+        driver.execute_script("arguments[0].click();", element)
+        time.sleep(1.5)
+    except Exception as e:
+        print(f"❌ 클릭 실패: {value} - {e}")
+
 def get_products(driver):
     wait = WebDriverWait(driver, 10)
     wait.until(EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover')))
@@ -73,17 +87,17 @@ def crawl_monitor_list(crawling_url, max_page=25):
     time.sleep(2)
 
     try:
-        driver.find_element(By.XPATH, '//option[@value="90"]').click()
+        click_element_when_ready(driver, By.XPATH, '//option[@value="90"]')
     except:
         print("❌ '90개 보기' 클릭 실패")
 
     total_results = []
     seen_ids = set()
 
+    # 탭별로 크롤링
     for tab_name, tab_xpath in [("NEW", '//li[@data-sort-method="NEW"]'), ("BEST", '//li[@data-sort-method="BEST"]')]:
         try:
-            driver.find_element(By.XPATH, tab_xpath).click()
-            time.sleep(2)
+            click_element_when_ready(driver, By.XPATH, tab_xpath)
 
             for page in range(1, max_page + 1):
                 print(f"[{tab_name}] 📄 {page}페이지 크롤링 중...")
@@ -103,9 +117,9 @@ def crawl_monitor_list(crawling_url, max_page=25):
 
                 try:
                     if page % 10 == 0:
-                        driver.find_element(By.XPATH, '//a[@class="edge_nav nav_next"]').click()
+                        click_element_when_ready(driver, By.XPATH, '//a[@class="edge_nav nav_next"]')
                     else:
-                        driver.find_element(By.XPATH, f'//a[@class="num "][{page % 10}]').click()
+                        click_element_when_ready(driver, By.XPATH, f'//a[@class="num "][{page % 10}]')
                 except:
                     print(f"🔚 [{tab_name}] 다음 페이지 없음")
                     break
