@@ -16,7 +16,7 @@ import traceback
 from multiprocessing import Pool
 
 # 설정
-PROCESS_COUNT = 1  # 모니터만 수집하므로 1로 설정
+PROCESS_COUNT = 2
 CRAWLING_DATA_CSV_FILE = 'CrawlingCategory.csv'
 DATA_PATH = 'crawl_data'
 DATA_REFRESH_PATH = f'{DATA_PATH}/Last_Data'
