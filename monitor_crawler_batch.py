@@ -16,10 +16,16 @@ def setup_driver():
     options.add_argument('--no-sandbox')
     return webdriver.Chrome(options=options)
 
+def wait_for_overlay(driver):
+    try:
+        WebDriverWait(driver, 10).until(
+            EC.invisibility_of_element_located((By.CLASS_NAME, 'product_list_cover'))
+        )
+    except:
+        time.sleep(2)
+
 def get_product_list(driver):
-    WebDriverWait(driver, 10).until(
-        EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover'))
-    )
+    wait_for_overlay(driver)
     time.sleep(1)
 
     products = driver.find_elements(By.XPATH, '//ul[@class="product_list"]/li')
@@ -56,6 +62,7 @@ def crawl_monitor_products(url, max_pages=200):
 
     try:
         driver.find_element(By.XPATH, '//option[@value="90"]').click()
+        wait_for_overlay(driver)
     except:
         print("⚠️ '90개 보기' 클릭 실패")
 
@@ -64,11 +71,17 @@ def crawl_monitor_products(url, max_pages=200):
 
     for sort_method in ['NEW', 'BEST']:
         try:
-            driver.find_element(By.XPATH, f'//li[@data-sort-method="{sort_method}"]').click()
-            time.sleep(2)
+            print(f"\n🔁 정렬: {sort_method}")
+            sort_btn = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, f'//li[@data-sort-method="{sort_method}"]'))
+            )
+            sort_btn.click()
+            wait_for_overlay(driver)
+            time.sleep(1)
 
             for page_index in range(-1, max_pages):
-                print(f"[{sort_method}] 페이지 {page_index+1 if page_index >= 0 else '초기'} 수집 중...")
+                page_label = f"페이지 {page_index + 1}" if page_index >= 0 else "초기"
+                print(f"[{sort_method}] {page_label} 수집 중...")
 
                 if page_index >= 0:
                     try:
@@ -80,6 +93,8 @@ def crawl_monitor_products(url, max_pages=200):
                                 if btn.text == str((page_index % 10) + 1):
                                     btn.click()
                                     break
+                        wait_for_overlay(driver)
+                        time.sleep(1)
                     except:
                         print(f"⚠️ {sort_method} 페이지 {page_index+1} 이동 실패")
                         break
@@ -93,7 +108,7 @@ def crawl_monitor_products(url, max_pages=200):
                         new_count += 1
 
                 if new_count == 0:
-                    print(f"🔚 {sort_method} - 중복으로 더 이상 수집 없음")
+                    print(f"🔚 {sort_method} - 중복으로 중단")
                     break
 
         except Exception as e:
