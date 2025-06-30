@@ -13,10 +13,10 @@ import csv
 import os
 import shutil
 import traceback
-import time
 
-from collections import OrderedDict
+from multiprocessing import Pool
 
+PROCESS_COUNT = 1
 CRAWLING_DATA_CSV_FILE = 'CrawlingCategory.csv'
 DATA_PATH = 'crawl_data'
 DATA_REFRESH_PATH = f'{DATA_PATH}/Last_Data'
@@ -29,6 +29,7 @@ DATA_PRODUCT_DIVIDER = '|'
 STR_NAME = 'name'
 STR_URL = 'url'
 STR_CRAWLING_PAGE_SIZE = 'crawlingPageSize'
+
 
 class DanawaMonitorCrawler:
     def __init__(self):
@@ -45,14 +46,25 @@ class DanawaMonitorCrawler:
 
     def start(self):
         self.refresh_data()
-        for category in self.crawlingCategory:
-            self.crawl(category)
+        self.start_crawling()
         self.sort_data()
 
-    def crawl(self, category):
-        name = category[STR_NAME]
-        url = category[STR_URL]
-        page_size = category[STR_CRAWLING_PAGE_SIZE]
+    def start_crawling(self):
+        chrome_option = webdriver.ChromeOptions()
+        chrome_option.add_argument('--headless')
+        chrome_option.add_argument('--window-size=1920,1080')
+        chrome_option.add_argument('--disable-gpu')
+        chrome_option.add_argument('lang=ko_KR')
+
+        pool = Pool(processes=PROCESS_COUNT)
+        pool.map(self.crawl_category, self.crawlingCategory)
+        pool.close()
+        pool.join()
+
+    def crawl_category(self, categoryValue):
+        name = categoryValue[STR_NAME]
+        url = categoryValue[STR_URL]
+        page_size = categoryValue[STR_CRAWLING_PAGE_SIZE]
 
         print(f'Crawling Start: {name}')
         filename = f'{name}.csv'
@@ -60,87 +72,79 @@ class DanawaMonitorCrawler:
             writer = csv.writer(f)
             writer.writerow([self.now().strftime('%Y-%m-%d %H:%M:%S')])
 
-            chrome_option = webdriver.ChromeOptions()
-            chrome_option.add_argument('--headless')
-            chrome_option.add_argument('--window-size=1920,1080')
-            chrome_option.add_argument('--disable-gpu')
-            chrome_option.add_argument('lang=ko_KR')
-
-            service = Service(ChromeDriverManager().install())
-            browser = webdriver.Chrome(service=service, options=chrome_option)
-            browser.implicitly_wait(3)
-
             try:
-                collected = OrderedDict()
-                for sort_method in ['NEW', 'BEST']:
-                    browser.get(url)
+                chrome_option = webdriver.ChromeOptions()
+                chrome_option.add_argument('--headless')
+                chrome_option.add_argument('--window-size=1920,1080')
+                chrome_option.add_argument('--disable-gpu')
+                chrome_option.add_argument('lang=ko_KR')
+
+                service = Service(ChromeDriverManager().install())
+                browser = webdriver.Chrome(service=service, options=chrome_option)
+
+                browser.get(url)
+                WebDriverWait(browser, 5).until(
+                    EC.element_to_be_clickable((By.XPATH, '//option[@value="90"]'))
+                ).click()
+                WebDriverWait(browser, 10).until(
+                    EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover'))
+                )
+
+                for i in range(-1, page_size):
+                    if i == -1:
+                        browser.find_element(By.XPATH, '//li[@data-sort-method="NEW"]').click()
+                    elif i == 0:
+                        browser.find_element(By.XPATH, '//li[@data-sort-method="BEST"]').click()
+                    elif i > 0:
+                        if i % 10 == 0:
+                            browser.find_element(By.CLASS_NAME, 'edge_nav.nav_next').click()
+                        else:
+                            browser.find_element(By.XPATH, f'//a[@class="num "][{i % 10}]').click()
+
                     WebDriverWait(browser, 10).until(
-                        EC.presence_of_element_located((By.XPATH, f'//li[@data-sort-method="{sort_method}"]'))
-                    ).click()
-                    time.sleep(2)
+                        EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover'))
+                    )
 
-                    for page in range(1, page_size + 1):
-                        print(f"  Sort: {sort_method}, Page: {page}")
+                    products = browser.find_elements(By.XPATH, '//ul[@class="product_list"]/li')
+                    for product in products:
+                        pid = product.get_attribute('id')
+                        if not pid or pid.startswith('ad') or 'prod_ad_item' in product.get_attribute('class'):
+                            continue
 
-                        WebDriverWait(browser, 10).until(
-                            EC.presence_of_element_located((By.CLASS_NAME, 'product_list'))
-                        )
-                        time.sleep(1)
+                        productId = pid[11:]
+                        productName = product.find_element(By.XPATH, './div/div[2]/p/a').text.strip()
+                        productPrices = product.find_elements(By.XPATH, './div/div[3]/ul/li')
+                        priceStr = ''
 
-                        li_xpath = '//ul[@class="product_list"]/li[not(contains(@id, "ad")) and not(contains(@class, "prod_ad_item"))]'
-                        li_elements = browser.find_elements(By.XPATH, li_xpath)
+                        isMall = 'prod_top5' in product.find_element(By.XPATH, './div/div[3]').get_attribute('class')
 
-                        for li in li_elements:
-                            try:
-                                pid = li.get_attribute('id')
-                                if not pid or not pid.startswith('productItem_'):
-                                    continue
-
-                                productId = pid[11:]
-                                if productId in collected:
-                                    continue
-
-                                productName = li.find_element(By.XPATH, './div/div[2]/p/a').text.strip()
-                                price_blocks = li.find_elements(By.XPATH, './div/div[3]/ul/li')
-                                priceStr = ''
-
-                                for block in price_blocks:
-                                    if 'top5_button' in block.get_attribute('class'):
-                                        continue
-                                    try:
-                                        mall = block.find_element(By.XPATH, './a/div[1]').text.strip()
-                                        if not mall:
-                                            mall = block.find_element(By.XPATH, './a/div[1]/span[1]').text.strip()
-                                        price = block.find_element(By.XPATH, './a/div[2]/em').text.strip()
-                                        if priceStr:
-                                            priceStr += DATA_PRODUCT_DIVIDER
-                                        priceStr += f'{mall}{DATA_ROW_DIVIDER}{price}'
-                                    except:
-                                        continue
-
-                                collected[productId] = (productName, priceStr)
-                            except:
+                        for priceBlock in productPrices:
+                            if 'top5_button' in priceBlock.get_attribute('class'):
                                 continue
 
-                        try:
-                            pagination = browser.find_elements(By.XPATH, '//div[@class="number_wrap"]/a')
-                            next_btn = browser.find_element(By.XPATH, '//a[@class="edge_nav nav_next"]')
-                            if 'disable' in next_btn.get_attribute('class'):
-                                break
-                            next_btn.click()
-                            time.sleep(2)
-                        except:
-                            break
+                            if priceStr:
+                                priceStr += DATA_PRODUCT_DIVIDER
 
-                for pid, (pname, price) in collected.items():
-                    writer.writerow([pid, pname, price])
+                            if isMall:
+                                mallName = priceBlock.find_element(By.XPATH, './a/div[1]').text.strip()
+                                if not mallName:
+                                    mallName = priceBlock.find_element(By.XPATH, './a/div[1]/span[1]').text.strip()
+                                price = priceBlock.find_element(By.XPATH, './a/div[2]/em').text.strip()
+                                priceStr += f'{mallName}{DATA_ROW_DIVIDER}{price}'
+                            else:
+                                desc = priceBlock.find_element(By.XPATH, './div/p').text.strip()
+                                desc = self.remove_rank(desc.replace('\n', DATA_ROW_DIVIDER))
+                                price = priceBlock.find_element(By.XPATH, './p[2]/a/strong').text.strip()
+                                priceStr += f'{desc}{DATA_ROW_DIVIDER}{price}' if desc else price
+
+                        writer.writerow([productId, productName, priceStr])
+
+                browser.quit()
 
             except Exception:
                 print(f'Error - {name}')
                 print(traceback.format_exc())
                 self.errorList.append(name)
-            finally:
-                browser.quit()
 
         print(f'Crawling Finish: {name}')
 
@@ -231,6 +235,12 @@ class DanawaMonitorCrawler:
 
     def now(self):
         return datetime.now(timezone(TIMEZONE))
+
+    def remove_rank(self, text):
+        if len(text) >= 2 and text[0].isdigit() and text[1] == '위':
+            return text[2:].strip()
+        return text
+
 
 if __name__ == '__main__':
     crawler = DanawaMonitorCrawler()
