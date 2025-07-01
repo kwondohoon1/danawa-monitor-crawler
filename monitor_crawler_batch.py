@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import csv, os, time, traceback
-from datetime import datetime, timedelta
+from datetime import datetime
 from pytz import timezone
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -48,6 +48,8 @@ def crawl_category(category):
     out_file = f'{DATA_PATH}/{name}.csv'
     os.makedirs(DATA_PATH, exist_ok=True)
 
+    visited_ids = set()
+
     with open(out_file, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow(['Id', 'Name', 'Price', 'CrawlTime'])
@@ -58,15 +60,9 @@ def crawl_category(category):
 
             sort_methods = ['NEW', 'BEST']
             for sort in sort_methods:
-                try:
-                    driver.find_element(By.XPATH, f'//li[@data-sort-method="{sort}"]').click()
-                    time.sleep(2)
-                except:
-                    continue
-
                 for page in range(1, page_size + 1):
                     try:
-                        paged_url = f"{url}&sort={sort}&page={page}"
+                        paged_url = f"{url}&sort={sort}&page={page}&crawlingPageSize=120"
                         driver.get(paged_url)
                         WebDriverWait(driver, 10).until(
                             EC.presence_of_element_located((By.CSS_SELECTOR, "ul.product_list li.prod_item"))
@@ -74,12 +70,19 @@ def crawl_category(category):
                         time.sleep(1.5)
                         products = driver.find_elements(By.CSS_SELECTOR, "ul.product_list li.prod_item")
 
+                        if not products:
+                            break
+
                         for product in products:
                             pid = product.get_attribute("id")
                             if not pid or pid.startswith("ad") or "prod_ad_item" in product.get_attribute("class"):
                                 continue
 
                             productId = pid.replace("productItem_", "")
+                            if productId in visited_ids:
+                                continue
+                            visited_ids.add(productId)
+
                             try:
                                 name_el = product.find_element(By.CSS_SELECTOR, 'div.prod_info p.prod_name a')
                                 productName = name_el.text.strip()
@@ -101,7 +104,7 @@ def crawl_category(category):
 
                             writer.writerow([productId, productName, priceStr, now()])
                     except Exception as e:
-                        print(f"⚠️ 페이지 {page} 오류: {e}")
+                        print(f"⚠️ 페이지 {page} 오류 ({sort} 정렬): {e}")
                         continue
             driver.quit()
 
