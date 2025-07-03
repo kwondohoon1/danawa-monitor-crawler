@@ -9,30 +9,27 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
-from multiprocessing import Pool
 
-TIMEZONE = 'Asia/Seoul'
 CRAWLING_DATA_CSV_FILE = 'CrawlingCategory.csv'
 DATA_PATH = 'crawl_data'
-DATA_ROW_DIVIDER = '_'
+TIMEZONE = 'Asia/Seoul'
 DATA_PRODUCT_DIVIDER = '|'
-PROCESS_COUNT = 2  # 병렬처리 개수 조절 가능
+DATA_ROW_DIVIDER = '_'
 
 def now():
     return datetime.now(timezone(TIMEZONE)).strftime('%Y-%m-%d %H:%M:%S')
 
 def get_crawling_targets():
-    targets = []
-    with open(CRAWLING_DATA_CSV_FILE, 'r', encoding='utf-8') as f:
-        reader = csv.reader(f)
-        for row in reader:
+    categories = []
+    with open(CRAWLING_DATA_CSV_FILE, 'r', newline='') as f:
+        for row in csv.reader(f):
             if not row[0].startswith('//'):
-                targets.append({
+                categories.append({
                     'name': row[0],
                     'url': row[1],
                     'page_size': int(row[2])
                 })
-    return targets
+    return categories
 
 def setup_driver():
     options = Options()
@@ -40,7 +37,7 @@ def setup_driver():
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--window-size=1920,1080')
-    options.add_argument('lang=ko_KR')
+    options.add_argument("lang=ko_KR")
     service = Service(ChromeDriverManager().install())
     return webdriver.Chrome(service=service, options=options)
 
@@ -50,7 +47,6 @@ def crawl_category(category):
     page_size = category['page_size']
     out_file = f'{DATA_PATH}/{name}.csv'
     os.makedirs(DATA_PATH, exist_ok=True)
-    visited_ids = set()
 
     with open(out_file, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
@@ -58,21 +54,25 @@ def crawl_category(category):
 
         try:
             driver = setup_driver()
-            sort_tabs = ['NEW', 'BEST']
+            driver.get(url)
 
-            for sort in sort_tabs:
+            sort_methods = ['NEW', 'BEST']
+            for sort in sort_methods:
+                try:
+                    driver.find_element(By.XPATH, f'//li[@data-sort-method="{sort}"]').click()
+                    time.sleep(2)
+                except:
+                    continue
+
                 for page in range(1, page_size + 1):
                     try:
-                        paged_url = f"{url}&sort={sort}&page={page}&crawlingPageSize=120"
+                        paged_url = f"{url}&sort={sort}&page={page}"
                         driver.get(paged_url)
                         WebDriverWait(driver, 10).until(
                             EC.presence_of_element_located((By.CSS_SELECTOR, "ul.product_list li.prod_item"))
                         )
-                        time.sleep(1.2)
+                        time.sleep(1.5)
                         products = driver.find_elements(By.CSS_SELECTOR, "ul.product_list li.prod_item")
-
-                        if not products:
-                            break
 
                         for product in products:
                             pid = product.get_attribute("id")
@@ -80,12 +80,9 @@ def crawl_category(category):
                                 continue
 
                             productId = pid.replace("productItem_", "")
-                            if productId in visited_ids:
-                                continue
-                            visited_ids.add(productId)
-
                             try:
-                                productName = product.find_element(By.CSS_SELECTOR, 'div.prod_info p.prod_name a').text.strip()
+                                name_el = product.find_element(By.CSS_SELECTOR, 'div.prod_info p.prod_name a')
+                                productName = name_el.text.strip()
                             except:
                                 continue
 
@@ -104,17 +101,17 @@ def crawl_category(category):
 
                             writer.writerow([productId, productName, priceStr, now()])
                     except Exception as e:
-                        print(f'⚠️ 오류 - {name} | {sort} | 페이지 {page}: {e}')
+                        print(f"⚠️ 페이지 {page} 오류: {e}")
                         continue
             driver.quit()
+
         except Exception as e:
-            print(f'❌ 크롤링 실패 - {name}')
+            print(f"❌ 크롤링 실패 - {name}")
             print(traceback.format_exc())
 
 if __name__ == '__main__':
     categories = get_crawling_targets()
-    print(f'총 카테고리 수: {len(categories)}')
-    pool = Pool(PROCESS_COUNT)
-    pool.map(crawl_category, categories)
-    pool.close()
-    pool.join()
+    for category in categories:
+        print(f'🚀 Start crawling: {category["name"]}')
+        crawl_category(category)
+        print(f'✅ Finished: {category["name"]}\n')
