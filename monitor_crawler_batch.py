@@ -1,35 +1,24 @@
 # -*- coding: utf-8 -*-
 import csv, os, time, traceback
-from datetime import datetime, timedelta
+from datetime import datetime
 from pytz import timezone
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 
-CRAWLING_DATA_CSV_FILE = 'CrawlingCategory.csv'
 DATA_PATH = 'crawl_data'
 TIMEZONE = 'Asia/Seoul'
 DATA_PRODUCT_DIVIDER = '|'
 DATA_ROW_DIVIDER = '_'
+CATEGORY_NAME = 'Monitor'
+CATEGORY_URL = 'https://prod.danawa.com/list/?cate=112757'
+CRAWL_SORTS = ['NEW', 'BEST']
+MAX_PAGE = 300  # 필요 시 더 증가 가능
 
 def now():
     return datetime.now(timezone(TIMEZONE)).strftime('%Y-%m-%d %H:%M:%S')
-
-def get_crawling_targets():
-    categories = []
-    with open(CRAWLING_DATA_CSV_FILE, 'r', newline='') as f:
-        for row in csv.reader(f):
-            if not row[0].startswith('//'):
-                categories.append({
-                    'name': row[0],
-                    'url': row[1],
-                    'page_size': int(row[2])
-                })
-    return categories
 
 def setup_driver():
     options = Options()
@@ -38,48 +27,44 @@ def setup_driver():
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--window-size=1920,1080')
     options.add_argument("lang=ko_KR")
-    service = Service(ChromeDriverManager().install())
-    return webdriver.Chrome(service=service, options=options)
+    return webdriver.Chrome(options=options)
 
-def crawl_category(category):
-    name = category['name']
-    url = category['url']
-    page_size = category['page_size']
-    out_file = f'{DATA_PATH}/{name}.csv'
+def crawl_all_monitors():
     os.makedirs(DATA_PATH, exist_ok=True)
+    output_file = os.path.join(DATA_PATH, f"{CATEGORY_NAME}.csv")
 
-    with open(out_file, 'w', newline='', encoding='utf-8') as f:
+    with open(output_file, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow(['Id', 'Name', 'Price', 'CrawlTime'])
 
         try:
             driver = setup_driver()
-            driver.get(url)
+            crawled_ids = set()
 
-            sort_methods = ['NEW', 'BEST']
-            for sort in sort_methods:
-                try:
-                    driver.find_element(By.XPATH, f'//li[@data-sort-method="{sort}"]').click()
-                    time.sleep(2)
-                except:
-                    continue
-
-                for page in range(1, page_size + 1):
+            for sort in CRAWL_SORTS:
+                for page in range(1, MAX_PAGE + 1):
+                    paged_url = f"{CATEGORY_URL}&sort={sort}&page={page}"
                     try:
-                        paged_url = f"{url}&sort={sort}&page={page}"
                         driver.get(paged_url)
                         WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, "ul.product_list li.prod_item"))
+                            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "ul.product_list li.prod_item"))
                         )
                         time.sleep(1.5)
                         products = driver.find_elements(By.CSS_SELECTOR, "ul.product_list li.prod_item")
 
+                        if not products:
+                            break
+
+                        new_count = 0
                         for product in products:
                             pid = product.get_attribute("id")
                             if not pid or pid.startswith("ad") or "prod_ad_item" in product.get_attribute("class"):
                                 continue
 
                             productId = pid.replace("productItem_", "")
+                            if productId in crawled_ids:
+                                continue
+
                             try:
                                 name_el = product.find_element(By.CSS_SELECTOR, 'div.prod_info p.prod_name a')
                                 productName = name_el.text.strip()
@@ -100,18 +85,21 @@ def crawl_category(category):
                                 priceStr = ''
 
                             writer.writerow([productId, productName, priceStr, now()])
+                            crawled_ids.add(productId)
+                            new_count += 1
+
+                        if new_count == 0:
+                            break
                     except Exception as e:
                         print(f"⚠️ 페이지 {page} 오류: {e}")
                         continue
             driver.quit()
 
-        except Exception as e:
-            print(f"❌ 크롤링 실패 - {name}")
+        except Exception:
+            print(f"❌ 크롤링 실패")
             print(traceback.format_exc())
 
 if __name__ == '__main__':
-    categories = get_crawling_targets()
-    for category in categories:
-        print(f'🚀 Start crawling: {category["name"]}')
-        crawl_category(category)
-        print(f'✅ Finished: {category["name"]}\n')
+    print(f'🚀 Start crawling: {CATEGORY_NAME}')
+    crawl_all_monitors()
+    print(f'✅ Finished: {CATEGORY_NAME}')
