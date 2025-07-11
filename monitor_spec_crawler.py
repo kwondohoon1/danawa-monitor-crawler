@@ -1,8 +1,6 @@
 import pandas as pd
 import time
 import re
-import math
-import os
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -31,6 +29,7 @@ REFRESH_RATE_LIST = [
     "480Hz", "500Hz", "540Hz"
 ]
 
+# 필터 함수
 def extract_inch(text):
     match = INCH_PATTERN.search(text)
     return match.group(0) if match else ""
@@ -53,13 +52,9 @@ def extract_refresh_rate(text):
             return hz
     return ""
 
-def crawl_specs_from_csv(input_csv="monitor_list.csv", output_csv="monitor_spec_list.csv", part=0, total_parts=5):
-    full = pd.read_csv(input_csv, encoding="utf-8-sig")
-    chunk_size = math.ceil(len(full) / total_parts)
-    df = full.iloc[part * chunk_size : (part + 1) * chunk_size]
-
-    print(f"📦 전체 {len(full)}개 중 {part+1}/{total_parts} 파트 실행 중: {len(df)}개 대상")
-
+# 크롤링 함수
+def crawl_specs_from_csv(input_csv="monitor_list.csv", output_csv="monitor_spec_list.csv"):
+    df = pd.read_csv(input_csv)
     results = []
 
     options = Options()
@@ -67,6 +62,9 @@ def crawl_specs_from_csv(input_csv="monitor_list.csv", output_csv="monitor_spec_
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--window-size=1920,1080')
+
+    # Colab용 크롬 경로 (필요시 활성화)
+    # options.binary_location = "/usr/bin/chromium-browser"
 
     driver = webdriver.Chrome(options=options)
     wait = WebDriverWait(driver, 10)
@@ -77,7 +75,7 @@ def crawl_specs_from_csv(input_csv="monitor_list.csv", output_csv="monitor_spec_
         price = row["가격"]
 
         url = f"https://prod.danawa.com/info/?pcode={product_id}&cate=112757"
-        print(f"🔍 [{idx+1}] {model_name} → {url}")
+        print(f"🔍 [{idx+1}/{len(df)}] {model_name} → {url}")
 
         try:
             driver.get(url)
@@ -109,20 +107,8 @@ def crawl_specs_from_csv(input_csv="monitor_list.csv", output_csv="monitor_spec_
             })
 
     driver.quit()
-
-    partial_output = f"monitor_spec_part_{part+1}.csv"
-    pd.DataFrame(results).to_csv(partial_output, index=False, encoding="utf-8-sig")
-    print(f"✅ {partial_output} 저장 완료")
-
-    if part == total_parts - 1:
-        print("🔗 최종 병합 중...")
-        merged = pd.concat([
-            pd.read_csv(f"monitor_spec_part_{i+1}.csv", encoding="utf-8-sig")
-            for i in range(total_parts)
-        ])
-        merged.to_csv(output_csv, index=False, encoding="utf-8-sig")
-        print(f"🎉 전체 병합 완료 → {output_csv}")
+    pd.DataFrame(results).to_csv(output_csv, index=False, encoding="utf-8-sig")
+    print(f"✅ {output_csv} 저장 완료")
 
 if __name__ == "__main__":
-    for part in range(5):
-        crawl_specs_from_csv(part=part, total_parts=5)
+    crawl_specs_from_csv()
