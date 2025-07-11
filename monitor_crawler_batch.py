@@ -1,5 +1,4 @@
 import time
-import csv
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -7,7 +6,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-def crawl_monitor_list(crawling_url, max_page=50):
+def crawl_monitor_list(crawling_url):
     options = Options()
     options.add_argument('--headless')
     options.add_argument('--window-size=1920,1080')
@@ -20,25 +19,25 @@ def crawl_monitor_list(crawling_url, max_page=50):
     driver.get(crawling_url)
     time.sleep(2)
 
-    # 한 페이지 90개 보기 설정
     try:
         driver.find_element(By.XPATH, '//option[@value="90"]').click()
         wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, 'product_list_cover')))
     except:
-        print("⚠️ 페이지당 90개 설정 실패")
+        pass
 
     results = {}
-    
-    for page in range(1, max_page + 1):
+    page = 1
+    fail_count = 0
+
+    while True:
         print(f"📄 {page}페이지 크롤링 중...")
         try:
             wait.until(EC.presence_of_all_elements_located((By.XPATH, '//ul[@class="product_list"]/li')))
         except:
-            print("⏳ 제품 로딩 대기 실패")
-            continue
+            print("⏳ 로딩 실패")
+            break
 
         time.sleep(1)
-
         products = driver.find_elements(By.XPATH, '//ul[@class="product_list"]/li')
 
         for product in products:
@@ -47,13 +46,11 @@ def crawl_monitor_list(crawling_url, max_page=50):
                 if not pid or "ad" in pid:
                     continue
                 product_id = pid.replace("productItem", "")
-
                 if product_id in results:
-                    continue  # 중복 제거
+                    continue
 
                 model_name = product.find_element(By.XPATH, './div/div[2]/p/a').text.strip()
 
-                # 가격 추출
                 price = "가격없음"
                 try:
                     price = product.find_element(By.CSS_SELECTOR, 'p.price_sect strong').text.replace(",", "").strip()
@@ -71,19 +68,27 @@ def crawl_monitor_list(crawling_url, max_page=50):
             except:
                 continue
 
-        # 페이지 이동 (다음 버튼 사용)
         try:
-            next_button = driver.find_element(By.XPATH, '//a[@class="edge_nav nav_next"]')
+            next_button = driver.find_element(By.CSS_SELECTOR, 'a.edge_nav.nav_next')
             if "disabled" in next_button.get_attribute("class"):
-                print("🔚 마지막 페이지 도달")
                 break
             next_button.click()
+            page += 1
+            fail_count = 0
+            time.sleep(2)
         except:
             try:
-                driver.find_element(By.LINK_TEXT, str(page + 1)).click()
+                next_page = driver.find_element(By.LINK_TEXT, str(page + 1))
+                next_page.click()
+                page += 1
+                fail_count = 0
+                time.sleep(2)
             except:
-                print("⚠️ 페이지 전환 실패")
-                break
+                fail_count += 1
+                if fail_count >= 3:
+                    print("🔚 페이지 전환 실패 3회")
+                    break
+                time.sleep(2)
 
     driver.quit()
 
