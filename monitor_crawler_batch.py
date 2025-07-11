@@ -7,7 +7,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-def crawl_monitor_list(crawling_url, max_page=100):
+def crawl_monitor_list(crawling_url, max_page=60):
     options = Options()
     options.add_argument('--headless')
     options.add_argument('--window-size=1920,1080')
@@ -23,7 +23,7 @@ def crawl_monitor_list(crawling_url, max_page=100):
     driver.get(crawling_url)
     time.sleep(2)
 
-    # 페이지당 90개 보기
+    # 90개씩 보기
     try:
         driver.find_element(By.XPATH, '//option[@value="90"]').click()
         wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, 'product_list_cover')))
@@ -40,10 +40,10 @@ def crawl_monitor_list(crawling_url, max_page=100):
         print("⚠️ 신상품순 정렬 실패")
 
     results = {}
-    page = 1
 
-    while page <= max_page:
+    for page in range(1, max_page + 1):
         print(f"📄 {page}페이지 크롤링 중...")
+
         try:
             wait.until(EC.presence_of_all_elements_located((By.XPATH, '//ul[@class="product_list"]/li')))
         except:
@@ -81,22 +81,12 @@ def crawl_monitor_list(crawling_url, max_page=100):
             except:
                 continue
 
-        # 페이지 전환
+        # 다음 페이지: JavaScript 함수 실행
         try:
-            page_buttons = driver.find_elements(By.XPATH, '//a[contains(@class, "num")]')
-            clicked = False
-            for btn in page_buttons:
-                if btn.text.strip() == str(page + 1):
-                    btn.click()
-                    page += 1
-                    clicked = True
-                    time.sleep(2)
-                    break
-            if not clicked:
-                print("🔚 다음 페이지 버튼 없음")
-                break
+            driver.execute_script(f"movePage({page + 1});")
+            time.sleep(2)
         except:
-            print("⚠️ 페이지 전환 실패")
+            print("🔚 movePage 실패")
             break
 
     driver.quit()
