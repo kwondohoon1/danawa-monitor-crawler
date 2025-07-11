@@ -23,24 +23,25 @@ def crawl_monitor_list(crawling_url, max_page=100):
     driver.get(crawling_url)
     time.sleep(2)
 
+    # 페이지당 90개 보기
     try:
         driver.find_element(By.XPATH, '//option[@value="90"]').click()
         wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, 'product_list_cover')))
     except:
         pass
 
-    results = {}
-
-    # 실제 신상품 정렬은 '신상품순' 필터 클릭 필요 (예: 정렬 기준 = 등록일)
+    # 정렬: 신상품순
     try:
-        sort_button = driver.find_element(By.XPATH, '//li[@data-sort-method="releaseDate"]')
+        sort_button = driver.find_element(By.XPATH, '//li[@data-sort-method="NEW"]')
         sort_button.click()
         wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, 'product_list_cover')))
-        print("🔀 정렬기준: 신상품순 (등록일 순)")
+        print("🔀 정렬기준: 신상품순")
     except:
-        print("⚠️ 신상품순 정렬 실패, 기본 정렬 유지")
+        print("⚠️ 신상품순 정렬 실패")
 
+    results = {}
     page = 1
+
     while page <= max_page:
         print(f"📄 {page}페이지 크롤링 중...")
         try:
@@ -80,18 +81,22 @@ def crawl_monitor_list(crawling_url, max_page=100):
             except:
                 continue
 
-        # AJAX 기반 페이지 전환: 페이지 번호 버튼 클릭
+        # 페이지 전환
         try:
             page_buttons = driver.find_elements(By.XPATH, '//a[contains(@class, "num")]')
+            clicked = False
             for btn in page_buttons:
                 if btn.text.strip() == str(page + 1):
                     btn.click()
                     page += 1
+                    clicked = True
                     time.sleep(2)
                     break
-            else:
-                break  # 다음 페이지 번호가 없으면 종료
+            if not clicked:
+                print("🔚 다음 페이지 버튼 없음")
+                break
         except:
+            print("⚠️ 페이지 전환 실패")
             break
 
     driver.quit()
@@ -102,4 +107,4 @@ def crawl_monitor_list(crawling_url, max_page=100):
 
 if __name__ == "__main__":
     url = "https://prod.danawa.com/list/?cate=112757"
-    crawl_monitor_list(url)
+    crawl_monitor_list(url, max_page=60)
