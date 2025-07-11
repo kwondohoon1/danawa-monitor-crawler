@@ -97,4 +97,4 @@ def crawl_monitor_list(crawling_url, max_page=60):
 
 if __name__ == "__main__":
     url = "https://prod.danawa.com/list/?cate=112757"
-    crawl_monitor_list(url, max_page=60)
+    crawl_monitor_list(url, max_page=150)
