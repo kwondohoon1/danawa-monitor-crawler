@@ -7,7 +7,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-def crawl_monitor_list(crawling_url, max_page=35):
+def crawl_monitor_list(crawling_url, max_page=50):
     options = Options()
     options.add_argument('--headless')
     options.add_argument('--window-size=1920,1080')
@@ -20,60 +20,76 @@ def crawl_monitor_list(crawling_url, max_page=35):
     driver.get(crawling_url)
     time.sleep(2)
 
-    driver.find_element(By.XPATH, '//option[@value="90"]').click()
-    wait.until(EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover')))
+    # 한 페이지 90개 보기 설정
+    try:
+        driver.find_element(By.XPATH, '//option[@value="90"]').click()
+        wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, 'product_list_cover')))
+    except:
+        print("⚠️ 페이지당 90개 설정 실패")
 
-    results = []
+    results = {}
+    
+    for page in range(1, max_page + 1):
+        print(f"📄 {page}페이지 크롤링 중...")
+        try:
+            wait.until(EC.presence_of_all_elements_located((By.XPATH, '//ul[@class="product_list"]/li')))
+        except:
+            print("⏳ 제품 로딩 대기 실패")
+            continue
 
-    for i in range(1, max_page + 1):
-        print(f"🔍 {i}페이지 크롤링 중...")
-        wait.until(EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover')))
         time.sleep(1)
 
         products = driver.find_elements(By.XPATH, '//ul[@class="product_list"]/li')
 
         for product in products:
             try:
-                if not product.get_attribute("id") or "ad" in product.get_attribute("id"):
+                pid = product.get_attribute("id")
+                if not pid or "ad" in pid:
                     continue
-                product_id = product.get_attribute("id").replace("productItem", "")
+                product_id = pid.replace("productItem", "")
+
+                if product_id in results:
+                    continue  # 중복 제거
+
                 model_name = product.find_element(By.XPATH, './div/div[2]/p/a').text.strip()
 
-                # 가격 파싱 시도 (2가지 구조 대응)
+                # 가격 추출
                 price = "가격없음"
                 try:
-                    # 방법 1: 대표 가격 (단일 strong 태그)
                     price = product.find_element(By.CSS_SELECTOR, 'p.price_sect strong').text.replace(",", "").strip()
                 except:
                     try:
-                        # 방법 2: 다중 쇼핑몰 가격 중 첫 번째 가격
                         price = product.find_element(By.CSS_SELECTOR, 'ul > li.mall_list_item > a > p.price_sect > strong').text.replace(",", "").strip()
                     except:
                         pass
 
-                results.append({
+                results[product_id] = {
                     "상품코드": product_id,
                     "모델명": model_name,
                     "가격": price
-                })
+                }
             except:
                 continue
 
-        # 페이지 이동
+        # 페이지 이동 (다음 버튼 사용)
         try:
-            if i % 10 == 0:
-                driver.find_element(By.XPATH, '//a[@class="edge_nav nav_next"]').click()
-            else:
-                driver.find_element(By.XPATH, f'//a[@class="num "][{i%10}]').click()
+            next_button = driver.find_element(By.XPATH, '//a[@class="edge_nav nav_next"]')
+            if "disabled" in next_button.get_attribute("class"):
+                print("🔚 마지막 페이지 도달")
+                break
+            next_button.click()
         except:
-            print("🔚 다음 페이지 없음")
-            break
+            try:
+                driver.find_element(By.LINK_TEXT, str(page + 1)).click()
+            except:
+                print("⚠️ 페이지 전환 실패")
+                break
 
     driver.quit()
 
-    df = pd.DataFrame(results)
+    df = pd.DataFrame(results.values())
     df.to_csv("monitor_list.csv", index=False, encoding="utf-8-sig")
-    print("✅ monitor_list.csv 저장 완료")
+    print(f"✅ monitor_list.csv 저장 완료 (총 {len(df)}개 제품)")
 
 if __name__ == "__main__":
     url = "https://prod.danawa.com/list/?cate=112757"
