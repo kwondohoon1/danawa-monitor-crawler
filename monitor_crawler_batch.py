@@ -1,105 +1,80 @@
-# -*- coding: utf-8 -*-
-import csv, os, time, traceback
-from datetime import datetime
-from pytz import timezone
+import time
+import csv
+import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-DATA_PATH = 'crawl_data'
-TIMEZONE = 'Asia/Seoul'
-DATA_PRODUCT_DIVIDER = '|'
-DATA_ROW_DIVIDER = '_'
-CATEGORY_NAME = 'Monitor'
-CATEGORY_URL = 'https://prod.danawa.com/list/?cate=112757'
-CRAWL_SORTS = ['NEW', 'BEST']
-MAX_PAGE = 300  # 필요 시 더 증가 가능
-
-def now():
-    return datetime.now(timezone(TIMEZONE)).strftime('%Y-%m-%d %H:%M:%S')
-
-def setup_driver():
+def crawl_monitor_list(crawling_url, max_page=35):
     options = Options()
     options.add_argument('--headless')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--window-size=1920,1080')
-    options.add_argument("lang=ko_KR")
-    return webdriver.Chrome(options=options)
+    options.add_argument('--disable-gpu')
+    options.add_argument('--no-sandbox')
 
-def crawl_all_monitors():
-    os.makedirs(DATA_PATH, exist_ok=True)
-    output_file = os.path.join(DATA_PATH, f"{CATEGORY_NAME}.csv")
+    driver = webdriver.Chrome(options=options)
+    wait = WebDriverWait(driver, 10)
 
-    with open(output_file, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.writer(f)
-        writer.writerow(['Id', 'Name', 'Price', 'CrawlTime'])
+    driver.get(crawling_url)
+    time.sleep(2)
 
-        try:
-            driver = setup_driver()
-            crawled_ids = set()
+    driver.find_element(By.XPATH, '//option[@value="90"]').click()
+    wait.until(EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover')))
 
-            for sort in CRAWL_SORTS:
-                for page in range(1, MAX_PAGE + 1):
-                    paged_url = f"{CATEGORY_URL}&sort={sort}&page={page}"
+    results = []
+
+    for i in range(1, max_page + 1):
+        print(f"🔍 {i}페이지 크롤링 중...")
+        wait.until(EC.invisibility_of_element((By.CLASS_NAME, 'product_list_cover')))
+        time.sleep(1)
+
+        products = driver.find_elements(By.XPATH, '//ul[@class="product_list"]/li')
+
+        for product in products:
+            try:
+                if not product.get_attribute("id") or "ad" in product.get_attribute("id"):
+                    continue
+                product_id = product.get_attribute("id").replace("productItem", "")
+                model_name = product.find_element(By.XPATH, './div/div[2]/p/a').text.strip()
+
+                # 가격 파싱 시도 (2가지 구조 대응)
+                price = "가격없음"
+                try:
+                    # 방법 1: 대표 가격 (단일 strong 태그)
+                    price = product.find_element(By.CSS_SELECTOR, 'p.price_sect strong').text.replace(",", "").strip()
+                except:
                     try:
-                        driver.get(paged_url)
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "ul.product_list li.prod_item"))
-                        )
-                        time.sleep(1.5)
-                        products = driver.find_elements(By.CSS_SELECTOR, "ul.product_list li.prod_item")
+                        # 방법 2: 다중 쇼핑몰 가격 중 첫 번째 가격
+                        price = product.find_element(By.CSS_SELECTOR, 'ul > li.mall_list_item > a > p.price_sect > strong').text.replace(",", "").strip()
+                    except:
+                        pass
 
-                        if not products:
-                            break
+                results.append({
+                    "상품코드": product_id,
+                    "모델명": model_name,
+                    "가격": price
+                })
+            except:
+                continue
 
-                        new_count = 0
-                        for product in products:
-                            pid = product.get_attribute("id")
-                            if not pid or pid.startswith("ad") or "prod_ad_item" in product.get_attribute("class"):
-                                continue
+        # 페이지 이동
+        try:
+            if i % 10 == 0:
+                driver.find_element(By.XPATH, '//a[@class="edge_nav nav_next"]').click()
+            else:
+                driver.find_element(By.XPATH, f'//a[@class="num "][{i%10}]').click()
+        except:
+            print("🔚 다음 페이지 없음")
+            break
 
-                            productId = pid.replace("productItem_", "")
-                            if productId in crawled_ids:
-                                continue
+    driver.quit()
 
-                            try:
-                                name_el = product.find_element(By.CSS_SELECTOR, 'div.prod_info p.prod_name a')
-                                productName = name_el.text.strip()
-                            except:
-                                continue
+    df = pd.DataFrame(results)
+    df.to_csv("monitor_list.csv", index=False, encoding="utf-8-sig")
+    print("✅ monitor_list.csv 저장 완료")
 
-                            priceStr = ''
-                            try:
-                                price_uls = product.find_elements(By.CSS_SELECTOR, 'div.prod_pricelist ul li')
-                                for priceBlock in price_uls:
-                                    if 'top5_button' in priceBlock.get_attribute('class'):
-                                        continue
-                                    mallName = priceBlock.find_element(By.CSS_SELECTOR, 'a div.prod_mall_area').text.strip()
-                                    price = priceBlock.find_element(By.CSS_SELECTOR, 'a div.prod_price span.price_sect em').text.strip()
-                                    priceStr += f'{mallName}{DATA_ROW_DIVIDER}{price}{DATA_PRODUCT_DIVIDER}'
-                                priceStr = priceStr.strip(DATA_PRODUCT_DIVIDER)
-                            except:
-                                priceStr = ''
-
-                            writer.writerow([productId, productName, priceStr, now()])
-                            crawled_ids.add(productId)
-                            new_count += 1
-
-                        if new_count == 0:
-                            break
-                    except Exception as e:
-                        print(f"⚠️ 페이지 {page} 오류: {e}")
-                        continue
-            driver.quit()
-
-        except Exception:
-            print(f"❌ 크롤링 실패")
-            print(traceback.format_exc())
-
-if __name__ == '__main__':
-    print(f'🚀 Start crawling: {CATEGORY_NAME}')
-    crawl_all_monitors()
-    print(f'✅ Finished: {CATEGORY_NAME}')
+if __name__ == "__main__":
+    url = "https://prod.danawa.com/list/?cate=112757"
+    crawl_monitor_list(url)
