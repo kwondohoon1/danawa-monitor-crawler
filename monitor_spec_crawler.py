@@ -7,52 +7,41 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# 스펙 기준 리스트
-INCH_LIST = ["22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32",
-             "34", "35", "37", "38", "39", "40", "42", "43", "45", "48", "49", "55", "57", "65"]
-INCH_PATTERN = re.compile(rf"({'|'.join(INCH_LIST)})인치")
-
-PANEL_LIST = ["OLED", "Nano-IPS", "IPS", "VA", "TN"]
-
-RESOLUTION_LIST = [
-    "1920 x 1080(FHD)", "1920 x 1200(WUXGA)", "1920 x 1280", "2048 x 1152", "2160 x 1440", "2240 x 1400",
-    "2560 x 1080(WFHD)", "2560 x 1440(QHD)", "2560 x 1600(WQXGA)", "2560 x 2880(SDQHD)",
-    "3440 x 1440(Ultra WQHD)", "3840 x 1080(DFHD)", "3840 x 1600(WQHD+)", "3840 x 2160(4K UHD)",
-    "3840 x 2400(WQUXGA)", "3840 x 2560", "4096 x 2160(4K DCI)", "4200 x 2800",
-    "5120 x 1440(DQHD)", "5120 x 2160(WUHD)", "5120 x 2880(5K UHD)"
-]
-
-REFRESH_RATE_LIST = [
-    "60Hz", "65Hz", "70Hz", "75Hz", "90Hz", "95Hz", "100Hz", "120Hz", "138Hz", "144Hz",
-    "155Hz", "160Hz", "165Hz", "170Hz", "175Hz", "180Hz", "200Hz", "220Hz", "240Hz",
-    "250Hz", "260Hz", "270Hz", "280Hz", "300Hz", "320Hz", "360Hz", "380Hz", "400Hz",
-    "480Hz", "500Hz", "540Hz"
-]
-
-# 필터 함수
+# -----------------------------
+# 다나와 맞춤형 필터 함수 (슬래시 분리 및 정규식 활용)
+# -----------------------------
 def extract_inch(text):
-    match = INCH_PATTERN.search(text)
-    return match.group(0) if match else ""
-
-def extract_panel(text):
-    for panel in PANEL_LIST:
-        if panel in text:
-            return panel
-    return ""
+    """ '34인치' 형태에서 숫자+인치만 정확히 추출 """
+    match = re.search(r'(\d+)\s*인치', text)
+    return match.group(0).replace(" ", "") if match else ""
 
 def extract_resolution(text):
-    for res in RESOLUTION_LIST:
-        if res in text:
-            return res
+    """ '숫자 x 숫자' 패턴이 포함된 슬래시(/) 덩어리를 통째로 추출 (예: Ultra WQHD(3440 x 1440)) """
+    for part in text.split('/'):
+        if re.search(r'\d{3,4}\s*[xX]\s*\d{3,4}', part):
+            return part.strip()
     return ""
 
 def extract_refresh_rate(text):
-    for hz in REFRESH_RATE_LIST:
-        if hz in text:
-            return hz
+    """ 텍스트 내에서 가장 높은 Hz 숫자를 찾아서 반환 (165Hz가 65Hz로 오인식되는 것 방지) """
+    hz_list = re.findall(r'(\d+)\s*Hz', text, re.IGNORECASE)
+    if hz_list:
+        max_hz = max(map(int, hz_list))
+        return f"{max_hz}Hz"
     return ""
 
-# 크롤링 함수
+def extract_panel(text):
+    """ 주요 패널 키워드가 포함된 슬래시(/) 덩어리를 통째로 추출 (예: IPS Black, Nano-IPS) """
+    panel_keywords = ["OLED", "IPS", "VA", "TN"]
+    for part in text.split('/'):
+        for keyword in panel_keywords:
+            if keyword in part.upper():
+                return part.strip()
+    return ""
+
+# -----------------------------
+# 크롤링 메인 로직
+# -----------------------------
 def crawl_specs_from_csv(input_csv="monitor_list.csv", output_csv="monitor_spec_list.csv"):
     df = pd.read_csv(input_csv)
     results = []
@@ -62,9 +51,6 @@ def crawl_specs_from_csv(input_csv="monitor_list.csv", output_csv="monitor_spec_
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--window-size=1920,1080')
-
-    # Colab용 크롬 경로 (필요시 활성화)
-    # options.binary_location = "/usr/bin/chromium-browser"
 
     driver = webdriver.Chrome(options=options)
     wait = WebDriverWait(driver, 10)
