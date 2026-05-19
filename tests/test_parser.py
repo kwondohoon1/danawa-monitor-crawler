@@ -1,6 +1,6 @@
 import unittest
 
-from danawa_crawler.core import Category, parse_products
+from danawa_crawler.core import Category, has_next_page, move_page_numbers, parse_products
 
 
 class ParserTests(unittest.TestCase):
@@ -26,7 +26,7 @@ class ParserTests(unittest.TestCase):
         """
         category = Category(slug="monitor", name="모니터", url="https://prod.danawa.com/list/?cate=112757")
 
-        products = parse_products(html, category, "https://example.test", "2026-05-18T09:00:00+09:00")
+        products = parse_products(html, category, "2026-05-18T09:00:00+09:00")
 
         self.assertEqual(len(products), 1)
         self.assertEqual(products[0].product_code, "123456")
@@ -34,7 +34,16 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(products[0].price, 125000)
         self.assertEqual(products[0].price_text, "125,000원")
 
+    def test_parse_move_page_numbers(self):
+        html = """
+        <a onclick="javascript:movePage(2); return false;">2</a>
+        <a onclick="javascript:movePage(11); return false;">다음 페이지</a>
+        """
+
+        self.assertEqual(move_page_numbers(html), [2, 11])
+        self.assertTrue(has_next_page(html, 10))
+        self.assertFalse(has_next_page(html, 11))
+
 
 if __name__ == "__main__":
     unittest.main()
-

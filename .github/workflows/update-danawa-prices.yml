@@ -12,6 +12,7 @@ permissions:
 jobs:
   crawl:
     runs-on: ubuntu-latest
+    timeout-minutes: 180
 
     steps:
       - name: Checkout
@@ -31,8 +32,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Run tests
+        run: python -m unittest discover -s tests
+
       - name: Crawl Danawa
-        run: python scripts/crawl_danawa.py --fail-on-empty
+        run: python scripts/crawl_danawa.py --fail-on-empty --fetcher requests --max-pages 100 --delay 0.05
 
       - name: Commit CSV changes
         run: |
@@ -45,4 +49,3 @@ jobs:
           else
             echo "No CSV changes"
           fi
-
