@@ -8,10 +8,6 @@
 
 - [모니터 가격](data/latest/monitor.csv)
 
-## History 바로가기
-
-- [모니터 가격 60일 데이터](data/history/monitor_price_history.csv)
-
 가격 CSV는 아래처럼 단순하게 저장됩니다.
 
 ```csv
@@ -49,6 +45,10 @@ product_code,product_name,2026-05-19,2026-05-18,2026-05-17,...
 - 색상
 - 특수기능
 - 정보전체
+
+## History 바로가기
+
+- [모니터 가격 60일 데이터](data/history/monitor_price_history.csv)
 
 ## 자동 업데이트
 
