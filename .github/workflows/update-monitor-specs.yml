@@ -1,0 +1,49 @@
+name: Update monitor specs CSV
+
+on:
+  schedule:
+    # 18:00 UTC = 03:00 KST
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m unittest discover -s tests
+
+      - name: Crawl monitor specs
+        run: python scripts/crawl_monitor_specs.py --workers 32 --timeout 20 --retries 3 --fail-on-error
+
+      - name: Commit CSV changes
+        run: |
+          if [[ -n "$(git status --porcelain data/specs)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/specs
+            git commit -m "Update monitor specs CSV"
+            git push
+          else
+            echo "No monitor specs changes"
+          fi
+

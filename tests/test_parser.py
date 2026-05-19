@@ -1,6 +1,7 @@
 import unittest
 
 from danawa_crawler.core import Category, has_next_page, move_page_numbers, parse_products
+from danawa_crawler.monitor_specs import parse_monitor_specs
 
 
 class ParserTests(unittest.TestCase):
@@ -43,6 +44,56 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(move_page_numbers(html), [2, 11])
         self.assertTrue(has_next_page(html, 10))
         self.assertFalse(has_next_page(html, 11))
+
+    def test_parse_monitor_top_specs(self):
+        html = """
+        <div class="spec_list">
+          <div class="items">
+            <span><u>모니터</u></span> /
+            <a><u><b>68.5cm(27인치)</b></u></a> /
+            <a><u><b>4K UHD(3840 x 2160)</b></u></a> /
+            <a><u><b>120Hz</b></u></a> /
+            <a><u><b>IPS Black</b></u></a> /
+            <a><u><b>와이드(16:9)</b></u></a> /
+            <span><u>평면</u></span> /
+            <span><u><b>[색상영역]</b></u></span>
+            <a><u>DCI-P3</u></a>: <a><u>99%</u></a> /
+            <span><u><b>[게임특화]</b></u></span>
+            <a><u>G-Sync 호환</u></a> /
+            <a><u>FreeSync</u></a> /
+            <span><u>듀얼 모드</u></span>: <span><u>4K 120Hz ↔ FHD 240Hz</u></span>
+          </div>
+        </div>
+        """
+
+        specs = parse_monitor_specs(html)
+
+        self.assertEqual(specs["inch"], "68.5cm(27인치)")
+        self.assertEqual(specs["resolution"], "4K UHD(3840x2160)")
+        self.assertEqual(specs["refresh_rate"], "120Hz")
+        self.assertEqual(specs["panel"], "IPS Black")
+        self.assertEqual(specs["aspect_ratio"], "와이드(16:9)")
+        self.assertEqual(specs["shape"], "평면")
+        self.assertEqual(specs["special_features"], "G-Sync 호환 / FreeSync / 듀얼 모드: 4K 120Hz ↔ FHD 240Hz")
+        self.assertIn("4K UHD(3840x2160)", specs["full_spec"])
+
+    def test_parse_monitor_resolution_without_resolution_label(self):
+        html = """
+        <div class="spec_list">
+          <div class="items">
+            <span><u>모니터</u></span> /
+            <span><u>54.6cm</u></span> /
+            <span><u>1920x1080(FHD)</u></span> /
+            <span><u>와이드(16:9)</u></span> /
+            <span><u>평면</u></span>
+          </div>
+        </div>
+        """
+
+        specs = parse_monitor_specs(html)
+
+        self.assertEqual(specs["inch"], "54.6cm")
+        self.assertEqual(specs["resolution"], "1920x1080(FHD)")
 
 
 if __name__ == "__main__":

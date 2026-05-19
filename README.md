@@ -10,6 +10,7 @@
 - [모니터 CSV](data/latest/monitor.csv)
 - [데스크탑 CSV](data/latest/desktop.csv)
 - [키보드 CSV](data/latest/keyboard.csv)
+- [모니터 스펙 CSV](data/specs/monitor_specs.csv)
 - [가격 히스토리 CSV](data/history/danawa_price_history.csv)
 
 ## 실행
@@ -52,5 +53,7 @@ python scripts/crawl_danawa.py --pages 2 --fail-on-empty
 ## GitHub Actions
 
 [Update Danawa price CSV](.github/workflows/update-danawa-prices.yml) workflow가 매일 09:00 KST에 실행됩니다. 크롤링 후 `data/` 아래 CSV가 바뀌면 GitHub Actions bot이 자동 커밋합니다.
+
+[Update monitor specs CSV](.github/workflows/update-monitor-specs.yml) workflow가 매일 03:00 KST에 실행됩니다. [모니터 CSV](data/latest/monitor.csv)의 상품코드 순서대로 상세페이지 상단 스펙을 병렬 수집해 [모니터 스펙 CSV](data/specs/monitor_specs.csv)를 갱신합니다.
 
 수동 실행은 GitHub Actions 화면에서 `workflow_dispatch`로 할 수 있습니다.
