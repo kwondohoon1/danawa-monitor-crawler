@@ -23,26 +23,9 @@ DEFAULT_USER_AGENT = (
     "Chrome/126.0.0.0 Safari/537.36"
 )
 
-LATEST_FIELDS = [
-    "collected_at",
-    "category",
-    "product_code",
-    "product_name",
-    "price",
-    "price_text",
-    "product_url",
-]
-
-HISTORY_FIELDS = [
-    "collected_date",
-    "collected_at",
-    "category",
-    "product_code",
-    "product_name",
-    "price",
-    "price_text",
-    "product_url",
-]
+PRICE_BASE_FIELDS = ["product_code", "product_name"]
+PRICE_DATE_FIELD = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+DEFAULT_PRICE_HISTORY_DAYS = 8
 
 
 @dataclass(frozen=True)
@@ -121,20 +104,6 @@ class Product:
     price_text: str
     product_url: str
     collected_at: str
-
-    def latest_row(self) -> dict[str, str]:
-        return {
-            "collected_at": self.collected_at,
-            "category": self.category,
-            "product_code": self.product_code,
-            "product_name": self.product_name,
-            "price": "" if self.price is None else str(self.price),
-            "price_text": self.price_text,
-            "product_url": self.product_url,
-        }
-
-    def history_row(self, collected_date: str) -> dict[str, str]:
-        return {"collected_date": collected_date, **self.latest_row()}
 
 
 class CrawlerError(RuntimeError):
@@ -947,37 +916,62 @@ def write_csv(path: Path, fields: list[str], rows: Iterable[dict[str, str]]) -> 
         writer.writerows(rows)
 
 
-def write_latest(output_dir: Path, products_by_category: dict[str, list[Product]]) -> None:
+def price_value(product: Product) -> str:
+    return "" if product.price is None else str(product.price)
+
+
+def read_existing_price_csv(path: Path) -> tuple[list[str], dict[str, dict[str, str]]]:
+    if not path.exists():
+        return [], {}
+
+    with path.open("r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        if reader.fieldnames is None:
+            return [], {}
+
+        date_fields = [field for field in reader.fieldnames if PRICE_DATE_FIELD.match(field)]
+        rows_by_code = {
+            row.get("product_code", ""): {field: row.get(field, "") for field in date_fields}
+            for row in reader
+            if row.get("product_code")
+        }
+        return date_fields, rows_by_code
+
+
+def write_price_csv(path: Path, products: list[Product], collected_date: str, history_days: int) -> None:
+    existing_dates, existing_rows = read_existing_price_csv(path)
+    date_fields = [field for field in existing_dates if field != collected_date]
+    date_fields = (date_fields + [collected_date])[-history_days:]
+
+    rows: list[dict[str, str]] = []
+    for product in products:
+        previous_prices = existing_rows.get(product.product_code, {})
+        row = {
+            "product_code": product.product_code,
+            "product_name": product.product_name,
+        }
+        for date_field in date_fields:
+            row[date_field] = previous_prices.get(date_field, "")
+        row[collected_date] = price_value(product)
+        rows.append(row)
+
+    write_csv(path, [*PRICE_BASE_FIELDS, *date_fields], rows)
+
+
+def write_latest(
+    output_dir: Path,
+    products_by_category: dict[str, list[Product]],
+    collected_date: str,
+    history_days: int = DEFAULT_PRICE_HISTORY_DAYS,
+) -> None:
     latest_dir, _ = ensure_output_dirs(output_dir)
     all_products: list[Product] = []
     for slug, products in products_by_category.items():
         all_products.extend(products)
-        rows = [product.latest_row() for product in products]
-        write_csv(latest_dir / f"{slug}.csv", LATEST_FIELDS, rows)
+        write_price_csv(latest_dir / f"{slug}.csv", products, collected_date, history_days)
 
     all_products.sort(key=lambda product: (product.category, product.product_name))
-    write_csv(latest_dir / "danawa_products.csv", LATEST_FIELDS, [product.latest_row() for product in all_products])
-
-
-def update_history(output_dir: Path, products_by_category: dict[str, list[Product]], collected_date: str) -> None:
-    _, history_dir = ensure_output_dirs(output_dir)
-    history_path = history_dir / "danawa_price_history.csv"
-    selected_categories = set(products_by_category)
-    rows: list[dict[str, str]] = []
-
-    if history_path.exists():
-        with history_path.open("r", encoding="utf-8-sig", newline="") as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                if row.get("collected_date") == collected_date and row.get("category") in selected_categories:
-                    continue
-                rows.append({field: row.get(field, "") for field in HISTORY_FIELDS})
-
-    for products in products_by_category.values():
-        rows.extend(product.history_row(collected_date) for product in products)
-
-    rows.sort(key=lambda row: (row["collected_date"], row["category"], row["product_code"]))
-    write_csv(history_path, HISTORY_FIELDS, rows)
+    write_price_csv(latest_dir / "danawa_products.csv", all_products, collected_date, history_days)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1016,9 +1010,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exit without writing CSV files if any selected category returns zero products.",
     )
     parser.add_argument(
-        "--no-history",
-        action="store_true",
-        help="Skip data/history/danawa_price_history.csv update.",
+        "--history-days",
+        type=int,
+        default=DEFAULT_PRICE_HISTORY_DAYS,
+        help="Number of daily price columns to keep in each CSV.",
     )
     return parser
 
@@ -1045,6 +1040,8 @@ def main(argv: list[str] | None = None) -> int:
         ]
     if args.max_pages < 1:
         raise CrawlerError("--max-pages must be at least 1")
+    if args.history_days < 1:
+        raise CrawlerError("--history-days must be at least 1")
 
     collected_at = datetime.now().astimezone().isoformat(timespec="seconds")
     collected_date = collected_at[:10]
@@ -1076,9 +1073,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"No products collected for: {', '.join(empty_categories)}", file=sys.stderr)
         return 2
 
-    write_latest(output_dir, products_by_category)
-    if not args.no_history:
-        update_history(output_dir, products_by_category, collected_date)
+    write_latest(output_dir, products_by_category, collected_date, args.history_days)
 
     total = sum(len(products) for products in products_by_category.values())
     print(f"Saved {total} products to {output_dir}")

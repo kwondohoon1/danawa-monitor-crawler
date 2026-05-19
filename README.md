@@ -11,7 +11,6 @@
 - [데스크탑 CSV](data/latest/desktop.csv)
 - [키보드 CSV](data/latest/keyboard.csv)
 - [모니터 스펙 CSV](data/specs/monitor_specs.csv)
-- [가격 히스토리 CSV](data/history/danawa_price_history.csv)
 
 ## 실행
 
@@ -34,15 +33,13 @@ python scripts/crawl_danawa.py --pages 2 --fail-on-empty
 
 `--pages`를 지정하면 가격 범위 분할 없이 지정한 페이지만 확인합니다. 전체 수집은 `--pages`를 빼고 실행합니다.
 
-## CSV 열
+## 가격 CSV 열
 
-- `collected_at`
-- `category`
 - `product_code`
 - `product_name`
-- `price`
-- `price_text`
-- `product_url`
+- `YYYY-MM-DD` 날짜별 가격 열
+
+가격 CSV는 상품코드와 상품명을 앞 2열에 두고, 3열부터 최근 최대 8일의 가격을 하루 한 열씩 누적합니다.
 
 ## 카테고리 설정
 
@@ -52,7 +49,7 @@ python scripts/crawl_danawa.py --pages 2 --fail-on-empty
 
 ## GitHub Actions
 
-[Update Danawa price CSV](.github/workflows/update-danawa-prices.yml) workflow가 매일 09:00 KST에 실행됩니다. 크롤링 후 `data/` 아래 CSV가 바뀌면 GitHub Actions bot이 자동 커밋합니다.
+[Update Danawa price CSV](.github/workflows/update-danawa-prices.yml) workflow가 매일 09:00 KST에 실행됩니다. 크롤링 후 `data/latest/` 아래 CSV가 바뀌면 GitHub Actions bot이 자동 커밋합니다.
 
 [Update monitor specs CSV](.github/workflows/update-monitor-specs.yml) workflow가 매일 03:00 KST에 실행됩니다. [모니터 CSV](data/latest/monitor.csv)의 상품코드 순서대로 상세페이지 상단 스펙을 병렬 수집해 [모니터 스펙 CSV](data/specs/monitor_specs.csv)를 갱신합니다.
 
