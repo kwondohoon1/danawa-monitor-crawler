@@ -986,12 +986,16 @@ def write_latest(
     products_by_category: dict[str, list[Product]],
     collected_date: str,
     history_days: int = DEFAULT_PRICE_HISTORY_DAYS,
+    write_combined: bool = True,
 ) -> None:
     latest_dir, _ = ensure_output_dirs(output_dir)
     all_products: list[Product] = []
     for slug, products in products_by_category.items():
         all_products.extend(products)
         write_price_csv(latest_dir / f"{slug}.csv", products, collected_date, history_days)
+
+    if not write_combined:
+        return
 
     all_products.sort(key=lambda product: (product.category, product.product_name))
     write_price_csv(latest_dir / "danawa_products.csv", all_products, collected_date, history_days)
@@ -1037,6 +1041,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=DEFAULT_PRICE_HISTORY_DAYS,
         help="Number of daily price columns to keep in each CSV.",
+    )
+    parser.add_argument(
+        "--skip-combined",
+        action="store_true",
+        help="Skip data/latest/danawa_products.csv update.",
     )
     return parser
 
@@ -1096,7 +1105,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"No products collected for: {', '.join(empty_categories)}", file=sys.stderr)
         return 2
 
-    write_latest(output_dir, products_by_category, collected_date, args.history_days)
+    write_latest(output_dir, products_by_category, collected_date, args.history_days, not args.skip_combined)
 
     total = sum(len(products) for products in products_by_category.values())
     print(f"Saved {total} products to {output_dir}")

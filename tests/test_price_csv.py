@@ -74,6 +74,31 @@ class PriceCsvTests(unittest.TestCase):
             self.assertEqual(rows[1]["product_code"], "200")
             self.assertEqual(rows[1]["2026-05-18"], "")
 
+    def test_write_latest_can_skip_combined_csv(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_dir = Path(tmp_dir) / "data"
+            write_latest(
+                output_dir,
+                {
+                    "monitor": [
+                        Product(
+                            category="monitor",
+                            product_code="100",
+                            product_name="Alpha",
+                            price=200,
+                            price_text="200원",
+                            product_url="",
+                            collected_at="2026-05-18T09:00:00+09:00",
+                        )
+                    ]
+                },
+                "2026-05-18",
+                write_combined=False,
+            )
+
+            self.assertTrue((output_dir / "latest" / "monitor.csv").exists())
+            self.assertFalse((output_dir / "latest" / "danawa_products.csv").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

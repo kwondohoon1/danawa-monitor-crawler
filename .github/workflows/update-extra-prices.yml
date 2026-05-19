@@ -43,7 +43,7 @@ jobs:
         run: python -m unittest discover -s tests
 
       - name: Crawl selected category prices
-        run: python scripts/crawl_danawa.py --category "${{ inputs.category }}" --fail-on-empty --fetcher requests --max-pages 100 --delay 0.1
+        run: python scripts/crawl_danawa.py --category "${{ inputs.category }}" --fail-on-empty --fetcher requests --max-pages 100 --delay 0.1 --skip-combined
 
       - name: Commit CSV changes
         run: |
