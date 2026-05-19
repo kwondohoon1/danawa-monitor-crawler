@@ -14,6 +14,8 @@ from urllib.parse import parse_qs, parse_qsl, urlencode, urljoin, urlparse, urlu
 
 import requests
 from bs4 import BeautifulSoup
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 
 BASE_URL = "https://prod.danawa.com"
@@ -22,6 +24,9 @@ DEFAULT_USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/126.0.0.0 Safari/537.36"
 )
+REQUEST_RETRIES = 6
+REQUEST_BACKOFF = 1.0
+RETRY_STATUS_CODES = (429, 500, 502, 503, 504)
 
 PRICE_BASE_FIELDS = ["product_code", "product_name"]
 PRICE_DATE_FIELD = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -205,6 +210,21 @@ def fetch_with_requests(session: requests.Session, url: str, timeout: int) -> st
     if not response.encoding:
         response.encoding = response.apparent_encoding
     return response.text
+
+
+def make_retry_adapter() -> HTTPAdapter:
+    retry = Retry(
+        total=REQUEST_RETRIES,
+        connect=REQUEST_RETRIES,
+        read=REQUEST_RETRIES,
+        status=REQUEST_RETRIES,
+        backoff_factor=REQUEST_BACKOFF,
+        status_forcelist=RETRY_STATUS_CODES,
+        allowed_methods=frozenset({"GET", "POST"}),
+        raise_on_status=False,
+        respect_retry_after_header=True,
+    )
+    return HTTPAdapter(max_retries=retry, pool_connections=16, pool_maxsize=16)
 
 
 def extract_js_object_body(html: str, variable_name: str) -> str:
@@ -545,6 +565,9 @@ def has_next_page(html: str, current_page: int) -> bool:
 
 def make_session() -> requests.Session:
     session = requests.Session()
+    retry_adapter = make_retry_adapter()
+    session.mount("https://", retry_adapter)
+    session.mount("http://", retry_adapter)
     session.headers.update(
         {
             "User-Agent": DEFAULT_USER_AGENT,

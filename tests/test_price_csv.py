@@ -3,10 +3,20 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from danawa_crawler.core import Product, write_latest
+from danawa_crawler.core import REQUEST_RETRIES, make_session, Product, write_latest
 
 
 class PriceCsvTests(unittest.TestCase):
+    def test_make_session_retries_get_and_post_requests(self):
+        session = make_session()
+        retry = session.adapters["https://"].max_retries
+
+        self.assertEqual(retry.total, REQUEST_RETRIES)
+        self.assertIn("GET", retry.allowed_methods)
+        self.assertIn("POST", retry.allowed_methods)
+        self.assertIn(429, retry.status_forcelist)
+        self.assertIn(503, retry.status_forcelist)
+
     def test_write_latest_keeps_only_base_and_recent_date_columns(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             output_dir = Path(tmp_dir) / "data"
