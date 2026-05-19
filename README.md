@@ -6,8 +6,11 @@
 
 ## 가격정보 바로가기
 
-- [모니터 가격 CSV](data/latest/monitor.csv)
-- [모니터 60일 가격 기록 CSV](data/history/monitor_price_history.csv)
+- [모니터 가격](data/latest/monitor.csv)
+
+## History 바로가기
+
+- [모니터 가격 60일 데이터](data/history/monitor_price_history.csv)
 
 가격 CSV는 아래처럼 단순하게 저장됩니다.
 
@@ -31,7 +34,7 @@ product_code,product_name,2026-05-19,2026-05-18,2026-05-17,...
 
 ## 스펙정보 바로가기
 
-- [모니터 스펙 CSV](data/specs/monitor_specs.csv)
+- [모니터 스펙](data/specs/monitor_specs.csv)
 
 스펙 CSV는 모니터 가격 CSV에 있는 상품코드 순서대로 수집합니다.
 
