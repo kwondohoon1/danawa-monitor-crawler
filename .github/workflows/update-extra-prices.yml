@@ -48,10 +48,11 @@ jobs:
       - name: Commit CSV changes
         run: |
           csv_path="data/latest/${{ inputs.category }}.csv"
-          if [[ -n "$(git status --porcelain "$csv_path")" ]]; then
+          history_path="data/history/${{ inputs.category }}_price_history.csv"
+          if [[ -n "$(git status --porcelain "$csv_path" "$history_path")" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add "$csv_path"
+            git add "$csv_path" "$history_path"
             git commit -m "Update Danawa ${{ inputs.category }} price CSV"
             git pull --rebase origin main
             git push

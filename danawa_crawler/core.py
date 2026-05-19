@@ -31,6 +31,7 @@ RETRY_STATUS_CODES = (429, 500, 502, 503, 504)
 PRICE_BASE_FIELDS = ["product_code", "product_name"]
 PRICE_DATE_FIELD = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DEFAULT_PRICE_HISTORY_DAYS = 8
+DEFAULT_HISTORY_FILE_DAYS = 60
 
 
 @dataclass(frozen=True)
@@ -963,7 +964,7 @@ def read_existing_price_csv(path: Path) -> tuple[list[str], dict[str, dict[str, 
 
 def recent_date_fields(collected_date: str, history_days: int) -> list[str]:
     end_date = date.fromisoformat(collected_date)
-    return [(end_date - timedelta(days=offset)).isoformat() for offset in range(history_days - 1, -1, -1)]
+    return [(end_date - timedelta(days=offset)).isoformat() for offset in range(history_days)]
 
 
 def write_price_csv(path: Path, products: list[Product], collected_date: str, history_days: int) -> None:
@@ -1003,6 +1004,17 @@ def write_latest(
 
     all_products.sort(key=lambda product: (product.category, product.product_name))
     write_price_csv(latest_dir / "danawa_products.csv", all_products, collected_date, history_days)
+
+
+def write_history(
+    output_dir: Path,
+    products_by_category: dict[str, list[Product]],
+    collected_date: str,
+    history_file_days: int = DEFAULT_HISTORY_FILE_DAYS,
+) -> None:
+    _, history_dir = ensure_output_dirs(output_dir)
+    for slug, products in products_by_category.items():
+        write_price_csv(history_dir / f"{slug}_price_history.csv", products, collected_date, history_file_days)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1047,6 +1059,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Number of daily price columns to keep in each CSV.",
     )
     parser.add_argument(
+        "--history-file-days",
+        type=int,
+        default=DEFAULT_HISTORY_FILE_DAYS,
+        help="Number of daily price columns to keep in data/history CSV files.",
+    )
+    parser.add_argument(
         "--skip-combined",
         action="store_true",
         help="Skip data/latest/danawa_products.csv update.",
@@ -1078,6 +1096,8 @@ def main(argv: list[str] | None = None) -> int:
         raise CrawlerError("--max-pages must be at least 1")
     if args.history_days < 1:
         raise CrawlerError("--history-days must be at least 1")
+    if args.history_file_days < 1:
+        raise CrawlerError("--history-file-days must be at least 1")
 
     collected_at = datetime.now().astimezone().isoformat(timespec="seconds")
     collected_date = collected_at[:10]
@@ -1110,6 +1130,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     write_latest(output_dir, products_by_category, collected_date, args.history_days, not args.skip_combined)
+    write_history(output_dir, products_by_category, collected_date, args.history_file_days)
 
     total = sum(len(products) for products in products_by_category.values())
     print(f"Saved {total} products to {output_dir}")

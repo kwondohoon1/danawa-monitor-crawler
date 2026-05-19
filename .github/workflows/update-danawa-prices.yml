@@ -41,10 +41,10 @@ jobs:
 
       - name: Commit CSV changes
         run: |
-          if [[ -n "$(git status --porcelain data/latest/monitor.csv)" ]]; then
+          if [[ -n "$(git status --porcelain data/latest/monitor.csv data/history/monitor_price_history.csv)" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add data/latest/monitor.csv
+            git add data/latest/monitor.csv data/history/monitor_price_history.csv
             git commit -m "Update Danawa price CSV"
             git pull --rebase origin main
             git push
