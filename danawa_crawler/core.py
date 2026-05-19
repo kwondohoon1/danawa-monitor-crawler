@@ -7,7 +7,7 @@ import re
 import sys
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Iterable
 from urllib.parse import parse_qs, parse_qsl, urlencode, urljoin, urlparse, urlunparse
@@ -961,10 +961,14 @@ def read_existing_price_csv(path: Path) -> tuple[list[str], dict[str, dict[str, 
         return date_fields, rows_by_code
 
 
+def recent_date_fields(collected_date: str, history_days: int) -> list[str]:
+    end_date = date.fromisoformat(collected_date)
+    return [(end_date - timedelta(days=offset)).isoformat() for offset in range(history_days - 1, -1, -1)]
+
+
 def write_price_csv(path: Path, products: list[Product], collected_date: str, history_days: int) -> None:
-    existing_dates, existing_rows = read_existing_price_csv(path)
-    date_fields = [field for field in existing_dates if field != collected_date]
-    date_fields = (date_fields + [collected_date])[-history_days:]
+    _, existing_rows = read_existing_price_csv(path)
+    date_fields = recent_date_fields(collected_date, history_days)
 
     rows: list[dict[str, str]] = []
     for product in products:

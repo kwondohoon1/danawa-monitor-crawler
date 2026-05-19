@@ -74,6 +74,51 @@ class PriceCsvTests(unittest.TestCase):
             self.assertEqual(rows[1]["product_code"], "200")
             self.assertEqual(rows[1]["2026-05-18"], "")
 
+    def test_write_latest_creates_fixed_date_columns_ending_today(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_dir = Path(tmp_dir) / "data"
+            write_latest(
+                output_dir,
+                {
+                    "monitor": [
+                        Product(
+                            category="monitor",
+                            product_code="100",
+                            product_name="Alpha",
+                            price=200,
+                            price_text="200원",
+                            product_url="",
+                            collected_at="2026-05-18T09:00:00+09:00",
+                        )
+                    ]
+                },
+                "2026-05-18",
+                history_days=8,
+                write_combined=False,
+            )
+
+            with (output_dir / "latest" / "monitor.csv").open("r", encoding="utf-8-sig", newline="") as file:
+                reader = csv.DictReader(file)
+                rows = list(reader)
+
+            self.assertEqual(
+                reader.fieldnames,
+                [
+                    "product_code",
+                    "product_name",
+                    "2026-05-11",
+                    "2026-05-12",
+                    "2026-05-13",
+                    "2026-05-14",
+                    "2026-05-15",
+                    "2026-05-16",
+                    "2026-05-17",
+                    "2026-05-18",
+                ],
+            )
+            self.assertEqual(rows[0]["2026-05-11"], "")
+            self.assertEqual(rows[0]["2026-05-18"], "200")
+
     def test_write_latest_can_skip_combined_csv(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             output_dir = Path(tmp_dir) / "data"
