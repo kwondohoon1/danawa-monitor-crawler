@@ -1,10 +1,16 @@
-name: Update Danawa price CSV
+name: Update extra Danawa price CSV
 
 on:
-  schedule:
-    # 00:00 UTC = 09:00 KST
-    - cron: "0 0 * * *"
   workflow_dispatch:
+    inputs:
+      category:
+        description: "Category to crawl"
+        required: true
+        default: "desktop"
+        type: choice
+        options:
+          - desktop
+          - keyboard
 
 permissions:
   contents: write
@@ -16,7 +22,7 @@ concurrency:
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 180
 
     steps:
       - name: Checkout
@@ -36,16 +42,17 @@ jobs:
       - name: Run tests
         run: python -m unittest discover -s tests
 
-      - name: Crawl monitor prices
-        run: python scripts/crawl_danawa.py --category monitor --fail-on-empty --fetcher requests --max-pages 100 --delay 0.1
+      - name: Crawl selected category prices
+        run: python scripts/crawl_danawa.py --category "${{ inputs.category }}" --fail-on-empty --fetcher requests --max-pages 100 --delay 0.1
 
       - name: Commit CSV changes
         run: |
-          if [[ -n "$(git status --porcelain data/latest/monitor.csv)" ]]; then
+          csv_path="data/latest/${{ inputs.category }}.csv"
+          if [[ -n "$(git status --porcelain "$csv_path")" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add data/latest/monitor.csv
-            git commit -m "Update Danawa price CSV"
+            git add "$csv_path"
+            git commit -m "Update Danawa ${{ inputs.category }} price CSV"
             git pull --rebase origin main
             git push
           else
