@@ -64,6 +64,9 @@ class ParserTests(unittest.TestCase):
             <span><u>듀얼 모드</u></span>: <span><u>4K 120Hz ↔ FHD 240Hz</u></span>
           </div>
         </div>
+        <div class="prod_info">
+          등록월: 2026.02. ㅣ 제조사: 테스트
+        </div>
         """
 
         specs = parse_monitor_specs(html)
@@ -76,6 +79,7 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(specs["shape"], "평면")
         self.assertEqual(specs["special_features"], "G-Sync 호환 / FreeSync / 듀얼 모드: 4K 120Hz ↔ FHD 240Hz")
         self.assertIn("4K UHD(3840x2160)", specs["full_spec"])
+        self.assertEqual(specs["registration_month"], "2026/02")
 
     def test_parse_monitor_resolution_without_resolution_label(self):
         html = """

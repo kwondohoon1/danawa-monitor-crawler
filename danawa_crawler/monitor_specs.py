@@ -31,6 +31,7 @@ SPEC_FIELDS = [
     "color",
     "special_features",
     "full_spec",
+    "registration_month",
     "fetch_status",
     "error",
 ]
@@ -255,7 +256,16 @@ def parse_monitor_specs(html: str) -> dict[str, str]:
         "color": extract_color(tokens),
         "special_features": join_tokens(special),
         "full_spec": join_tokens(tokens),
+        "registration_month": parse_registration_month(html),
     }
+
+
+def parse_registration_month(html: str) -> str:
+    text = BeautifulSoup(html, "html.parser").get_text(" ", strip=True)
+    match = re.search(r"등록월\s*:\s*(\d{4})\s*[./년]\s*(\d{1,2})", text)
+    if not match:
+        return ""
+    return f"{match.group(1)}/{int(match.group(2)):02d}"
 
 
 def empty_row(item: MonitorInput, collected_at: str, status: str, error: str = "") -> dict[str, str]:
