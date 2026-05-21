@@ -32,6 +32,7 @@ PRICE_BASE_FIELDS = ["product_code", "product_name"]
 PRICE_DATE_FIELD = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DEFAULT_PRICE_HISTORY_DAYS = 8
 DEFAULT_HISTORY_FILE_DAYS = 60
+SUPPLEMENTAL_SORT_METHODS = ["NEW"]
 
 
 @dataclass(frozen=True)
@@ -674,6 +675,49 @@ def crawl_price_segment(
     )
 
 
+def crawl_sorted_supplement(
+    category: Category,
+    session: requests.Session,
+    context: DanawaListContext,
+    collected_at: str,
+    referer_url: str,
+    list_count: int,
+    max_pages: int,
+    delay: float,
+    timeout: int,
+    sort_method: str,
+) -> list[Product]:
+    products_by_code: dict[str, Product] = {}
+
+    for page in range(1, max_pages + 1):
+        html = fetch_ajax_product_list(
+            session=session,
+            context=context,
+            page=page,
+            list_count=list_count,
+            referer=referer_url,
+            timeout=timeout,
+            sort_method=sort_method,
+        )
+        products = parse_products(html, category, collected_at)
+        new_count = merge_products(products_by_code, products)
+        print(
+            f"[{category.slug}] supplement {sort_method} page {page}: "
+            f"{len(products)} products, {new_count} new, {len(products_by_code)} supplement total"
+        )
+
+        if not products:
+            break
+        if page > 1 and new_count == 0:
+            break
+        if not has_next_page(html, page):
+            break
+        if delay > 0:
+            time.sleep(delay)
+
+    return sorted(products_by_code.values(), key=lambda product: product.product_name)
+
+
 def count_price_range(
     session: requests.Session,
     context: DanawaListContext,
@@ -792,7 +836,27 @@ def crawl_category_by_price(
                 )
             pending.insert(0, right)
 
-    print(f"[{category.slug}] collected {len(category_products):,} unique products after price splitting")
+    for sort_method in SUPPLEMENTAL_SORT_METHODS:
+        before = len(category_products)
+        supplemental_products = crawl_sorted_supplement(
+            category=category,
+            session=session,
+            context=context,
+            collected_at=collected_at,
+            referer_url=referer_url,
+            list_count=list_count,
+            max_pages=max_pages,
+            delay=delay,
+            timeout=timeout,
+            sort_method=sort_method,
+        )
+        added = merge_products(category_products, supplemental_products)
+        print(
+            f"[{category.slug}] supplement {sort_method} added "
+            f"{added:,} products ({before:,} -> {len(category_products):,})"
+        )
+
+    print(f"[{category.slug}] collected {len(category_products):,} unique products after supplements")
     return sorted(category_products.values(), key=lambda product: product.product_name)
 
 
