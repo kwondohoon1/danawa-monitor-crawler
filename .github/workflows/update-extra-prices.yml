@@ -10,7 +10,6 @@ on:
         type: choice
         options:
           - desktop
-          - keyboard
 
 permissions:
   contents: write

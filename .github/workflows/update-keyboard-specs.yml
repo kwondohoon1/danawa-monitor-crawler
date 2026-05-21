@@ -1,9 +1,9 @@
-name: Update monitor specs CSV
+name: Update keyboard specs CSV
 
 on:
   schedule:
-    # 18:00 UTC = 03:00 KST
-    - cron: "0 18 * * *"
+    # 19:00 UTC = 04:00 KST
+    - cron: "0 19 * * *"
   workflow_dispatch:
 
 permissions:
@@ -36,18 +36,18 @@ jobs:
       - name: Run tests
         run: python -m unittest discover -s tests
 
-      - name: Crawl monitor specs
-        run: python scripts/crawl_monitor_specs.py --workers 32 --timeout 20 --retries 3 --fail-on-error
+      - name: Crawl keyboard specs
+        run: python scripts/crawl_keyboard_specs.py --workers 32 --timeout 20 --retries 3 --fail-on-error
 
       - name: Commit CSV changes
         run: |
-          if [[ -n "$(git status --porcelain data/specs/monitor_specs.csv)" ]]; then
+          if [[ -n "$(git status --porcelain data/specs/keyboard_specs.csv)" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add data/specs/monitor_specs.csv
-            git commit -m "Update monitor specs CSV"
+            git add data/specs/keyboard_specs.csv
+            git commit -m "Update keyboard specs CSV"
             git pull --rebase origin main
             git push
           else
-            echo "No monitor specs changes"
+            echo "No keyboard specs changes"
           fi

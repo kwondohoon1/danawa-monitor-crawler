@@ -28,6 +28,7 @@ SPEC_FIELDS = [
     "panel",
     "aspect_ratio",
     "shape",
+    "brightness",
     "color",
     "special_features",
     "full_spec",
@@ -179,6 +180,14 @@ def extract_shape(values: list[str]) -> str:
     return ""
 
 
+def extract_brightness(values: list[str]) -> str:
+    for value in values:
+        match = re.search(r"(\d+(?:,\d{3})?(?:\.\d+)?)\s*nits?\b", value, re.I)
+        if match:
+            return f"{match.group(1).replace(',', '')}nits"
+    return ""
+
+
 def extract_color(tokens: list[str]) -> str:
     for idx, token in enumerate(tokens):
         if token in {"[색상영역]", "색상영역"}:
@@ -253,6 +262,7 @@ def parse_monitor_specs(html: str) -> dict[str, str]:
         "panel": extract_panel(values),
         "aspect_ratio": first_matching(values, r"\(\s*\d+\s*:\s*\d+\s*\)"),
         "shape": extract_shape(values),
+        "brightness": extract_brightness(values),
         "color": extract_color(tokens),
         "special_features": join_tokens(special),
         "full_spec": join_tokens(tokens),

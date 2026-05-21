@@ -1,6 +1,7 @@
 import unittest
 
 from danawa_crawler.core import Category, has_next_page, move_page_numbers, parse_products
+from danawa_crawler.keyboard_specs import extract_keyboard_specs
 from danawa_crawler.monitor_specs import parse_monitor_specs
 
 
@@ -56,6 +57,7 @@ class ParserTests(unittest.TestCase):
             <a><u><b>IPS Black</b></u></a> /
             <a><u><b>와이드(16:9)</b></u></a> /
             <span><u>평면</u></span> /
+            <span><u>450nits</u></span> /
             <span><u><b>[색상영역]</b></u></span>
             <a><u>DCI-P3</u></a>: <a><u>99%</u></a> /
             <span><u><b>[게임특화]</b></u></span>
@@ -77,6 +79,7 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(specs["panel"], "IPS Black")
         self.assertEqual(specs["aspect_ratio"], "와이드(16:9)")
         self.assertEqual(specs["shape"], "평면")
+        self.assertEqual(specs["brightness"], "450nits")
         self.assertEqual(specs["special_features"], "G-Sync 호환 / FreeSync / 듀얼 모드: 4K 120Hz ↔ FHD 240Hz")
         self.assertIn("4K UHD(3840x2160)", specs["full_spec"])
         self.assertEqual(specs["registration_month"], "2026/02")
@@ -98,6 +101,51 @@ class ParserTests(unittest.TestCase):
 
         self.assertEqual(specs["inch"], "54.6cm")
         self.assertEqual(specs["resolution"], "1920x1080(FHD)")
+
+    def test_parse_keyboard_specs(self):
+        html = """
+        <div class="spec_list">
+          <div class="items">
+            <span>키보드</span> /
+            <span>텐키리스</span> /
+            <span>유선+무선</span> /
+            <span>기계식</span> /
+            <span>내장 배터리</span> /
+            <span>4000mAh</span> /
+            <span>88키</span> /
+            <span>키압: 45g</span> /
+            <span>1000Hz</span> /
+            <span>1ms 응답속도</span> /
+            <span>동시입력: 무한</span> /
+            <span>PBT</span> /
+            <span>이중사출 키캡</span> /
+            <span>멀티페어링</span> /
+            <span>멀티미디어</span> /
+            <span>래피드 트리거</span>
+          </div>
+        </div>
+        <div>등록월: 2025.06.</div>
+        """
+
+        specs = extract_keyboard_specs(html, "테스트 저소음 바다축 키보드")
+
+        self.assertEqual(specs["size"], "텐키리스")
+        self.assertEqual(specs["key_layout"], "93~84키")
+        self.assertEqual(specs["connection_type"], "유선+무선")
+        self.assertEqual(specs["battery"], "내장 배터리")
+        self.assertEqual(specs["battery_capacity"], "4000~5999mAh")
+        self.assertEqual(specs["switch_contact_type"], "기계식")
+        self.assertEqual(specs["switch_type"], "저소음")
+        self.assertEqual(specs["actuation_force"], "45g")
+        self.assertEqual(specs["key_switch"], "저소음 바다축")
+        self.assertEqual(specs["polling_rate"], "1000Hz")
+        self.assertEqual(specs["response_time"], "1ms 응답속도")
+        self.assertEqual(specs["rollover"], "무한")
+        self.assertEqual(specs["keycap_material"], "PBT")
+        self.assertEqual(specs["keycap_printing"], "이중사출 키캡")
+        self.assertEqual(specs["extra_features"], "멀티페어링 / 멀티미디어 / 래피드 트리거")
+        self.assertIn("키보드", specs["full_spec"])
+        self.assertEqual(specs["registration_month"], "2025/06")
 
 
 if __name__ == "__main__":
