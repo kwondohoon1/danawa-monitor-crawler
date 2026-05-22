@@ -7,7 +7,7 @@ import re
 import sys
 import time
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable
 from urllib.parse import parse_qs, parse_qsl, urlencode, urljoin, urlparse, urlunparse
@@ -33,6 +33,11 @@ PRICE_DATE_FIELD = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DEFAULT_PRICE_HISTORY_DAYS = 8
 DEFAULT_HISTORY_FILE_DAYS = 60
 SUPPLEMENTAL_SORT_METHODS = ["NEW"]
+KST = timezone(timedelta(hours=9))
+
+
+def now_kst_iso() -> str:
+    return datetime.now(KST).isoformat(timespec="seconds")
 
 
 @dataclass(frozen=True)
@@ -598,7 +603,7 @@ def first_price_for_sort(
         timeout=timeout,
         sort_method=sort_method,
     )
-    products = parse_products(html, category, datetime.now().astimezone().isoformat(timespec="seconds"))
+    products = parse_products(html, category, now_kst_iso())
     for product in products:
         if product.price is not None:
             return product.price
@@ -1163,7 +1168,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.history_file_days < 1:
         raise CrawlerError("--history-file-days must be at least 1")
 
-    collected_at = datetime.now().astimezone().isoformat(timespec="seconds")
+    collected_at = now_kst_iso()
     collected_date = collected_at[:10]
     session = make_session()
     selenium_fetcher = SeleniumFetcher(timeout=args.timeout) if args.fetcher in {"auto", "selenium"} else None

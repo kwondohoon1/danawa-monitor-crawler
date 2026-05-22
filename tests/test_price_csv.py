@@ -1,12 +1,19 @@
 import csv
 import tempfile
 import unittest
+from datetime import datetime, timedelta
 from pathlib import Path
 
-from danawa_crawler.core import REQUEST_RETRIES, make_session, Product, write_history, write_latest
+from danawa_crawler.core import REQUEST_RETRIES, make_session, now_kst_iso, Product, write_history, write_latest
 
 
 class PriceCsvTests(unittest.TestCase):
+    def test_price_collection_timestamp_uses_kst(self):
+        timestamp = now_kst_iso()
+
+        self.assertTrue(timestamp.endswith("+09:00"))
+        self.assertEqual(timedelta(hours=9), datetime.fromisoformat(timestamp).utcoffset())
+
     def test_make_session_retries_get_and_post_requests(self):
         session = make_session()
         retry = session.adapters["https://"].max_retries
