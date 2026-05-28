@@ -6,9 +6,9 @@
 
 ## 가격정보 바로가기
 
-- [모니터 가격](data/latest/monitor.csv)
-- [키보드 가격](data/latest/keyboard.csv)
-- [노트북 가격](data/latest/laptop.csv)
+- [모니터 가격](data/latest/monitor.csv?raw=1)
+- [키보드 가격](data/latest/keyboard.csv?raw=1)
+- [노트북 가격](data/latest/laptop.csv?raw=1)
 
 가격 CSV는 아래처럼 단순하게 저장됩니다.
 
@@ -32,9 +32,9 @@ product_code,product_name,2026-05-19,2026-05-18,2026-05-17,...
 
 ## 스펙정보 바로가기
 
-- [모니터 스펙](data/specs/monitor_specs.csv)
-- [키보드 스펙](data/specs/keyboard_specs.csv)
-- [노트북 스펙](data/specs/laptop_specs.csv)
+- [모니터 스펙](data/specs/monitor_specs.csv?raw=1)
+- [키보드 스펙](data/specs/keyboard_specs.csv?raw=1)
+- [노트북 스펙](data/specs/laptop_specs.csv?raw=1)
 
 스펙 CSV는 각 가격 CSV에 있는 상품코드 순서대로 수집합니다.
 
@@ -88,9 +88,9 @@ product_code,product_name,2026-05-19,2026-05-18,2026-05-17,...
 
 ## History 바로가기
 
-- [모니터 가격 60일 데이터](data/history/monitor_price_history.csv)
-- [키보드 가격 60일 데이터](data/history/keyboard_price_history.csv)
-- [노트북 가격 60일 데이터](data/history/laptop_price_history.csv)
+- [모니터 가격 60일 데이터](data/history/monitor_price_history.csv?raw=1)
+- [키보드 가격 60일 데이터](data/history/keyboard_price_history.csv?raw=1)
+- [노트북 가격 60일 데이터](data/history/laptop_price_history.csv?raw=1)
 
 ## 자동 업데이트
 
