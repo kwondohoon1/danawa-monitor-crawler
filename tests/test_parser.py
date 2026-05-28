@@ -2,6 +2,7 @@ import unittest
 
 from danawa_crawler.core import Category, has_next_page, move_page_numbers, parse_products
 from danawa_crawler.keyboard_specs import extract_keyboard_specs
+from danawa_crawler.laptop_specs import parse_laptop_specs
 from danawa_crawler.monitor_specs import parse_monitor_specs
 
 
@@ -189,6 +190,48 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(specs["extra_features"], "멀티페어링 / 멀티미디어 / 래피드 트리거")
         self.assertIn("키보드", specs["full_spec"])
         self.assertEqual(specs["registration_month"], "2025/06")
+
+    def test_parse_laptop_specs(self):
+        html = """
+        <div class="spec_list">
+          <div class="items">
+            <span>노트북</span> /
+            <span>40.9cm(16.1인치)</span> /
+            <span>2.31kg</span> /
+            <span>OS미포함(프리도스)</span> /
+            <span>화면정보</span>
+            <span>해상도</span>: <span>1920x1080(FHD)</span> /
+            <span>주사율</span>: <span>165Hz</span> /
+            <span>CPU</span>
+            <span>AMD</span> /
+            <span>라이젠5(Zen4)</span> /
+            <span>8645HS (4.3GHz)</span> /
+            <span>NPU</span>: <span>16TOPS</span> /
+            <span>그래픽</span>
+            <span>외장그래픽</span> /
+            <span>RTX4060</span> /
+            <span>TGP</span>: <span>120W</span> /
+            <span>램</span>
+            <span>램</span>: <span>16GB</span> /
+            <span>용량</span>: <span>3TB</span>
+          </div>
+        </div>
+        <div>등록월: 2024.03.</div>
+        """
+
+        specs = parse_laptop_specs(html)
+
+        self.assertEqual(specs["inch"], "40.9cm(16.1인치)")
+        self.assertEqual(specs["weight"], "2.31kg")
+        self.assertEqual(specs["operating_system"], "OS미포함(프리도스)")
+        self.assertEqual(specs["resolution"], "1920x1080(FHD)")
+        self.assertEqual(specs["refresh_rate"], "165Hz")
+        self.assertEqual(specs["cpu"], "AMD / 라이젠5(Zen4) / 8645HS (4.3GHz)")
+        self.assertEqual(specs["graphics"], "외장그래픽 / RTX4060")
+        self.assertEqual(specs["ram"], "16GB")
+        self.assertEqual(specs["ssd"], "3TB")
+        self.assertIn("노트북", specs["full_spec"])
+        self.assertEqual(specs["registration_month"], "2024/03")
 
 
 if __name__ == "__main__":
