@@ -466,6 +466,59 @@ def product_name_from_node(node) -> str | None:
     return None
 
 
+def exact_name_with_option(base_name: str, option_name: str) -> str:
+    option_name = normalize_space(option_name)
+    if not option_name:
+        return base_name
+    if f"({option_name})" in base_name or base_name.endswith(option_name):
+        return base_name
+    return f"{base_name} ({option_name})"
+
+
+def product_code_from_detail_node(node) -> str | None:
+    node_id = node.get("id", "")
+    if node_id.startswith("productInfoDetail_"):
+        code = re.sub(r"\D", "", node_id[len("productInfoDetail_") :])
+        if code:
+            return code
+    return product_code_from_node(node)
+
+
+def product_option_from_detail_node(node) -> str:
+    for selector in [".memory_sect .text", ".memory_sect"]:
+        for element in node.select(selector):
+            text = normalize_space(element.get_text(" ", strip=True))
+            if text:
+                return text
+    return ""
+
+
+def variant_products_from_node(
+    node,
+    category: Category,
+    base_name: str,
+    collected_at: str,
+) -> list[Product]:
+    products: list[Product] = []
+    for detail_node in node.select(".prod_pricelist li[id^='productInfoDetail_']"):
+        product_code = product_code_from_detail_node(detail_node)
+        if not product_code:
+            continue
+        price, price_text = extract_price(detail_node)
+        products.append(
+            Product(
+                category=category.slug,
+                product_code=product_code,
+                product_name=exact_name_with_option(base_name, product_option_from_detail_node(detail_node)),
+                price=price,
+                price_text=price_text,
+                product_url=product_url_from_node(detail_node, product_code),
+                collected_at=collected_at,
+            )
+        )
+    return products
+
+
 def parse_price_value(text: str) -> int | None:
     cleaned = re.sub(r"[^\d,]", "", text)
     if not cleaned:
@@ -541,22 +594,27 @@ def parse_products(html: str, category: Category, collected_at: str) -> list[Pro
         if not product_code or not product_name:
             continue
 
-        price, price_text = extract_price(node)
-        product = Product(
-            category=category.slug,
-            product_code=product_code,
-            product_name=product_name,
-            price=price,
-            price_text=price_text,
-            product_url=product_url_from_node(node, product_code),
-            collected_at=collected_at,
-        )
+        item_products = variant_products_from_node(node, category, product_name, collected_at)
+        if not item_products:
+            price, price_text = extract_price(node)
+            item_products = [
+                Product(
+                    category=category.slug,
+                    product_code=product_code,
+                    product_name=product_name,
+                    price=price,
+                    price_text=price_text,
+                    product_url=product_url_from_node(node, product_code),
+                    collected_at=collected_at,
+                )
+            ]
 
-        existing = products.get(product_code)
-        if existing is None:
-            products[product_code] = product
-        elif product.price is not None and (existing.price is None or product.price < existing.price):
-            products[product_code] = product
+        for product in item_products:
+            existing = products.get(product.product_code)
+            if existing is None:
+                products[product.product_code] = product
+            elif product.price is not None and (existing.price is None or product.price < existing.price):
+                products[product.product_code] = product
 
     return list(products.values())
 

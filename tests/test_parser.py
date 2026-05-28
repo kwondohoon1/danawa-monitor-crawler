@@ -36,6 +36,49 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(products[0].price, 125000)
         self.assertEqual(products[0].price_text, "125,000원")
 
+    def test_parse_bundle_detail_products_with_option_names(self):
+        html = """
+        <ul class="product_list">
+          <li id="productItem63143933" class="prod_item">
+            <p class="prod_name">
+              <a href="//prod.danawa.com/info/?pcode=63143933">한성컴퓨터 TFG Cloud CL 유무선 기계식 코튼캔디</a>
+            </p>
+            <div class="prod_pricelist">
+              <ul>
+                <li id="productInfoDetail_63143933">
+                  <p class="price_sect">
+                    <a href="https://prod.danawa.com/info/?pcode=63143933&cate=112782"><strong>94,000</strong>원</a>
+                  </p>
+                  <p class="memory_sect"><span class="text">딥블루 뽀송</span></p>
+                </li>
+                <li id="productInfoDetail_94120037">
+                  <p class="price_sect">
+                    <a href="https://prod.danawa.com/info/?pcode=94120037&cate=112782"><strong>91,000</strong>원</a>
+                  </p>
+                  <p class="memory_sect"><span class="text">중고</span></p>
+                </li>
+              </ul>
+            </div>
+          </li>
+        </ul>
+        """
+        category = Category(slug="keyboard", name="키보드", url="https://prod.danawa.com/list/?cate=112782")
+
+        products = parse_products(html, category, "2026-05-18T09:00:00+09:00")
+        by_code = {product.product_code: product for product in products}
+
+        self.assertEqual(len(products), 2)
+        self.assertEqual(
+            by_code["63143933"].product_name,
+            "한성컴퓨터 TFG Cloud CL 유무선 기계식 코튼캔디 (딥블루 뽀송)",
+        )
+        self.assertEqual(
+            by_code["94120037"].product_name,
+            "한성컴퓨터 TFG Cloud CL 유무선 기계식 코튼캔디 (중고)",
+        )
+        self.assertEqual(by_code["63143933"].price, 94000)
+        self.assertEqual(by_code["94120037"].price, 91000)
+
     def test_parse_move_page_numbers(self):
         html = """
         <a onclick="javascript:movePage(2); return false;">2</a>
