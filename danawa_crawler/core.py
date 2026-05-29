@@ -46,6 +46,7 @@ class Category:
     name: str
     url: str
     pages: int | None = None
+    start_page: int = 1
 
 
 @dataclass(frozen=True)
@@ -692,7 +693,7 @@ def crawl_price_segment(
     timeout: int,
 ) -> SegmentResult:
     segment_products: dict[str, Product] = {}
-    page = 1
+    page = category.start_page
     total_count: int | None = None
     stopped_on_duplicate = False
 
@@ -948,7 +949,7 @@ def crawl_category(
         )
 
     category_products: dict[str, Product] = {}
-    page = 1
+    page = category.start_page
     context: DanawaListContext | None = None
     expected_pages: int | None = None
     referer_url = category_page_url(category, 1, list_count)
@@ -1159,6 +1160,8 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Limit page count for all selected categories. By default, categories crawl until the last page.",
     )
+    parser.add_argument("--page-start", type=int, default=1, help="First page to crawl when using page ranges.")
+    parser.add_argument("--page-end", type=int, help="Last page to crawl when using page ranges.")
     parser.add_argument(
         "--max-pages",
         type=int,
@@ -1214,9 +1217,23 @@ def main(argv: list[str] | None = None) -> int:
         if missing:
             raise CrawlerError(f"Unknown categories: {', '.join(sorted(missing))}")
 
-    if args.pages is not None:
+    if args.page_start < 1:
+        raise CrawlerError("--page-start must be at least 1")
+    page_end = args.page_end if args.page_end is not None else args.pages
+    if page_end is not None and page_end < args.page_start:
+        raise CrawlerError("--page-end/--pages must be greater than or equal to --page-start")
+    if args.page_start != 1 and page_end is None:
+        raise CrawlerError("--page-start requires --pages or --page-end")
+
+    if page_end is not None:
         categories = [
-            Category(slug=category.slug, name=category.name, url=category.url, pages=max(1, args.pages))
+            Category(
+                slug=category.slug,
+                name=category.name,
+                url=category.url,
+                pages=max(1, page_end),
+                start_page=args.page_start,
+            )
             for category in categories
         ]
     if args.max_pages < 1:

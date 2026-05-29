@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from danawa_crawler.core import REQUEST_RETRIES, make_session, now_kst_iso, Product, write_history, write_latest
+from danawa_crawler.price_merge import merge_price_parts
 
 
 class PriceCsvTests(unittest.TestCase):
@@ -197,6 +198,48 @@ class PriceCsvTests(unittest.TestCase):
 
             self.assertTrue((output_dir / "latest" / "monitor.csv").exists())
             self.assertFalse((output_dir / "latest" / "danawa_products.csv").exists())
+
+    def test_merge_price_parts_preserves_existing_history(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            parts_dir = root / "parts"
+            output_dir = root / "data"
+            (parts_dir / "part1").mkdir(parents=True)
+            (parts_dir / "part2").mkdir(parents=True)
+            (output_dir / "latest").mkdir(parents=True)
+            (output_dir / "history").mkdir(parents=True)
+
+            with (parts_dir / "part1" / "laptop.csv").open("w", encoding="utf-8-sig", newline="") as file:
+                writer = csv.DictWriter(file, fieldnames=["product_code", "product_name", "2026-05-29"])
+                writer.writeheader()
+                writer.writerow({"product_code": "100", "product_name": "Alpha", "2026-05-29": "200"})
+                writer.writerow({"product_code": "200", "product_name": "Beta", "2026-05-29": "300"})
+
+            with (parts_dir / "part2" / "laptop.csv").open("w", encoding="utf-8-sig", newline="") as file:
+                writer = csv.DictWriter(file, fieldnames=["product_code", "product_name", "2026-05-29"])
+                writer.writeheader()
+                writer.writerow({"product_code": "100", "product_name": "Alpha", "2026-05-29": "190"})
+
+            with (output_dir / "history" / "laptop_price_history.csv").open(
+                "w", encoding="utf-8-sig", newline=""
+            ) as file:
+                writer = csv.DictWriter(file, fieldnames=["product_code", "product_name", "2026-05-28"])
+                writer.writeheader()
+                writer.writerow({"product_code": "100", "product_name": "Alpha", "2026-05-28": "180"})
+
+            collected_date, count = merge_price_parts("laptop", parts_dir, output_dir, 2, 2)
+
+            with (output_dir / "history" / "laptop_price_history.csv").open(
+                "r", encoding="utf-8-sig", newline=""
+            ) as file:
+                reader = csv.DictReader(file)
+                rows = {row["product_code"]: row for row in reader}
+
+            self.assertEqual(collected_date, "2026-05-29")
+            self.assertEqual(count, 2)
+            self.assertEqual(rows["100"]["2026-05-29"], "190")
+            self.assertEqual(rows["100"]["2026-05-28"], "180")
+            self.assertEqual(rows["200"]["2026-05-29"], "300")
 
 
 if __name__ == "__main__":

@@ -133,6 +133,8 @@ python scripts/crawl_danawa.py --category keyboard --fail-on-empty --fetcher req
 python scripts/crawl_danawa.py --category laptop --pages 300 --fail-on-empty --fetcher requests
 ```
 
+노트북 가격 액션은 상품 수가 많아서 1-75, 76-150, 151-225, 226-300 페이지를 4개 파트로 나눠 병렬 수집한 뒤 하나의 CSV로 합칩니다.
+
 모니터 스펙 수집:
 
 ```bash
