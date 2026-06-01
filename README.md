@@ -1,6 +1,7 @@
 # 다나와 상품 데이터
 
 다나와에 올라온 모니터, 키보드, 노트북 상품의 가격과 스펙을 CSV로 모읍니다.
+CPU, 그래픽카드, 메인보드, RAM, SSD, HDD, 쿨러, 케이스, 파워는 가격만 수집합니다.
 
 각 카테고리는 서로 다른 GitHub Actions에서 따로 수집합니다.
 
@@ -9,6 +10,15 @@
 - [모니터 가격](data/latest/monitor.csv?raw=1)
 - [키보드 가격](data/latest/keyboard.csv?raw=1)
 - [노트북 가격](data/latest/laptop.csv?raw=1)
+- [CPU 가격](data/latest/cpu.csv?raw=1)
+- [그래픽카드 가격](data/latest/gpu.csv?raw=1)
+- [메인보드 가격](data/latest/motherboard.csv?raw=1)
+- [RAM 가격](data/latest/ram.csv?raw=1)
+- [SSD 가격](data/latest/ssd.csv?raw=1)
+- [HDD 가격](data/latest/hdd.csv?raw=1)
+- [쿨러 가격](data/latest/cooler.csv?raw=1)
+- [케이스 가격](data/latest/case.csv?raw=1)
+- [파워 가격](data/latest/power.csv?raw=1)
 
 가격 CSV는 아래처럼 단순하게 저장됩니다.
 
@@ -91,10 +101,20 @@ product_code,product_name,2026-05-19,2026-05-18,2026-05-17,...
 - [모니터 가격 60일 데이터](data/history/monitor_price_history.csv?raw=1)
 - [키보드 가격 60일 데이터](data/history/keyboard_price_history.csv?raw=1)
 - [노트북 가격 60일 데이터](data/history/laptop_price_history.csv?raw=1)
+- [CPU 가격 60일 데이터](data/history/cpu_price_history.csv?raw=1)
+- [그래픽카드 가격 60일 데이터](data/history/gpu_price_history.csv?raw=1)
+- [메인보드 가격 60일 데이터](data/history/motherboard_price_history.csv?raw=1)
+- [RAM 가격 60일 데이터](data/history/ram_price_history.csv?raw=1)
+- [SSD 가격 60일 데이터](data/history/ssd_price_history.csv?raw=1)
+- [HDD 가격 60일 데이터](data/history/hdd_price_history.csv?raw=1)
+- [쿨러 가격 60일 데이터](data/history/cooler_price_history.csv?raw=1)
+- [케이스 가격 60일 데이터](data/history/case_price_history.csv?raw=1)
+- [파워 가격 60일 데이터](data/history/power_price_history.csv?raw=1)
 
 ## 자동 업데이트
 
-- 가격정보: 매일 07:00 KST에 수집
+- 모니터/키보드/노트북 가격정보: 매일 07:00 KST에 수집
+- PC부품 가격정보: 매일 08:30 KST에 수집
 - 모니터 스펙정보: 매일 03:00 KST에 수집
 - 키보드 스펙정보: 매일 04:00 KST에 수집
 - 노트북 스펙정보: 매일 12:00 KST에 수집
@@ -108,7 +128,8 @@ product_code,product_name,2026-05-19,2026-05-18,2026-05-17,...
 - [Update keyboard specs CSV](.github/workflows/update-keyboard-specs.yml)
 - [Update laptop specs CSV](.github/workflows/update-laptop-specs.yml)
 
-데스크탑을 따로 돌리고 싶을 때는 아래 수동 액션을 실행하면 됩니다.
+CPU, 그래픽카드, 메인보드, RAM, SSD, HDD, 쿨러, 케이스, 파워는 아래 액션에서 한 번에 수집합니다.
+데스크탑은 같은 액션에서 수동으로만 돌릴 수 있습니다.
 
 - [Update extra Danawa price CSV](.github/workflows/update-extra-prices.yml)
 
@@ -134,6 +155,12 @@ python scripts/crawl_danawa.py --category laptop --pages 300 --fail-on-empty --f
 ```
 
 노트북 가격 액션은 상품 수가 많아서 1-75, 76-150, 151-225, 226-300 페이지를 4개 파트로 나눠 병렬 수집한 뒤 하나의 CSV로 합칩니다.
+
+PC부품 가격 수집:
+
+```bash
+python scripts/crawl_danawa.py --category cpu --category gpu --category motherboard --category ram --category ssd --category hdd --category cooler --category case --category power --fail-on-empty --fetcher requests --skip-combined
+```
 
 모니터 스펙 수집:
 
@@ -169,5 +196,14 @@ python -m unittest discover -s tests
 - `desktop`: 데스크탑
 - `keyboard`: 키보드
 - `laptop`: 노트북
+- `cpu`: CPU
+- `gpu`: 그래픽카드
+- `motherboard`: 메인보드
+- `ram`: RAM
+- `ssd`: SSD
+- `hdd`: HDD
+- `cooler`: 쿨러
+- `case`: 케이스
+- `power`: 파워
 
-매일 자동 수집은 모니터, 키보드, 노트북만 켜두었습니다. 데스크탑은 수동 액션으로 돌리거나, 나중에 별도 스케줄을 추가하면 됩니다.
+매일 자동 수집은 모니터, 키보드, 노트북, PC부품 가격만 켜두었습니다. 데스크탑은 수동 액션으로 돌리면 됩니다.

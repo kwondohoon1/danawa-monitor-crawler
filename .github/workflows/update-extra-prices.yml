@@ -1,15 +1,28 @@
 name: Update extra Danawa price CSV
 
 on:
+  schedule:
+    # 23:30 UTC = 08:30 KST
+    - cron: "30 23 * * *"
   workflow_dispatch:
     inputs:
       category:
         description: "Category to crawl"
         required: true
-        default: "desktop"
+        default: "all"
         type: choice
         options:
+          - all
           - desktop
+          - cpu
+          - gpu
+          - motherboard
+          - ram
+          - ssd
+          - hdd
+          - cooler
+          - case
+          - power
 
 permissions:
   contents: write
@@ -21,7 +34,9 @@ concurrency:
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 120
+    env:
+      TARGET_CATEGORY: ${{ github.event_name == 'workflow_dispatch' && inputs.category || 'all' }}
 
     steps:
       - name: Checkout
@@ -42,17 +57,40 @@ jobs:
         run: python -m unittest discover -s tests
 
       - name: Crawl selected category prices
-        run: python scripts/crawl_danawa.py --category "${{ inputs.category }}" --fail-on-empty --fetcher requests --max-pages 100 --delay 0.1 --skip-combined
+        run: |
+          if [[ "$TARGET_CATEGORY" == "all" ]]; then
+            categories=(cpu gpu motherboard ram ssd hdd cooler case power)
+          else
+            categories=("$TARGET_CATEGORY")
+          fi
+
+          args=()
+          for category in "${categories[@]}"; do
+            args+=(--category "$category")
+          done
+
+          python scripts/crawl_danawa.py "${args[@]}" --fail-on-empty --fetcher requests --max-pages 100 --delay 0.1 --skip-combined
 
       - name: Commit CSV changes
         run: |
-          csv_path="data/latest/${{ inputs.category }}.csv"
-          history_path="data/history/${{ inputs.category }}_price_history.csv"
-          if [[ -n "$(git status --porcelain "$csv_path" "$history_path")" ]]; then
+          if [[ "$TARGET_CATEGORY" == "all" ]]; then
+            categories=(cpu gpu motherboard ram ssd hdd cooler case power)
+            commit_message="Update PC parts price CSV"
+          else
+            categories=("$TARGET_CATEGORY")
+            commit_message="Update Danawa ${TARGET_CATEGORY} price CSV"
+          fi
+
+          paths=()
+          for category in "${categories[@]}"; do
+            paths+=("data/latest/${category}.csv" "data/history/${category}_price_history.csv")
+          done
+
+          if [[ -n "$(git status --porcelain -- "${paths[@]}")" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add "$csv_path" "$history_path"
-            git commit -m "Update Danawa ${{ inputs.category }} price CSV"
+            git add -- "${paths[@]}"
+            git commit -m "$commit_message"
             git pull --rebase origin main
             git push
           else
