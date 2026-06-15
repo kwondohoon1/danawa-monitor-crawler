@@ -1,6 +1,6 @@
 # 다나와 상품 데이터
 
-다나와에 올라온 모니터, 키보드, 노트북 상품의 가격과 스펙을 CSV로 모읍니다.
+다나와에 올라온 모니터, 키보드, 노트북, TV 상품의 가격과 스펙을 CSV로 모읍니다.
 CPU, 그래픽카드, 메인보드, RAM, SSD, HDD, 쿨러, 케이스, 파워는 가격만 수집합니다.
 
 각 카테고리는 서로 다른 GitHub Actions에서 따로 수집합니다.
@@ -10,6 +10,7 @@ CPU, 그래픽카드, 메인보드, RAM, SSD, HDD, 쿨러, 케이스, 파워는 
 - [모니터 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/latest/monitor.csv)
 - [키보드 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/latest/keyboard.csv)
 - [노트북 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/latest/laptop.csv)
+- [TV 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/latest/tv.csv)
 - [CPU 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/latest/cpu.csv)
 - [그래픽카드 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/latest/gpu.csv)
 - [메인보드 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/latest/motherboard.csv)
@@ -45,6 +46,7 @@ product_code,product_name,2026-05-19,2026-05-18,2026-05-17,...
 - [모니터 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/specs/monitor_specs.csv)
 - [키보드 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/specs/keyboard_specs.csv)
 - [노트북 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/specs/laptop_specs.csv)
+- [TV 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/specs/tv_specs.csv)
 
 스펙 CSV는 각 가격 CSV에 있는 상품코드 순서대로 수집합니다.
 
@@ -96,11 +98,23 @@ product_code,product_name,2026-05-19,2026-05-18,2026-05-17,...
 - 전체정보
 - 등록년월
 
+TV 스펙:
+
+- 화면크기
+- 화면종류
+- 해상도
+- 주사율
+- HDR
+- 스마트기능
+- 전체정보
+- 등록년월
+
 ## History 바로가기
 
 - [모니터 가격 60일 데이터](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/history/monitor_price_history.csv)
 - [키보드 가격 60일 데이터](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/history/keyboard_price_history.csv)
 - [노트북 가격 60일 데이터](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/history/laptop_price_history.csv)
+- [TV 가격 60일 데이터](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/history/tv_price_history.csv)
 - [CPU 가격 60일 데이터](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/history/cpu_price_history.csv)
 - [그래픽카드 가격 60일 데이터](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/history/gpu_price_history.csv)
 - [메인보드 가격 60일 데이터](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/history/motherboard_price_history.csv)
@@ -114,19 +128,23 @@ product_code,product_name,2026-05-19,2026-05-18,2026-05-17,...
 ## 자동 업데이트
 
 - 모니터/키보드/노트북 가격정보: 매일 07:00 KST에 수집
+- TV 가격정보: 매일 07:30 KST에 수집
 - PC부품 가격정보: 매일 08:30 KST에 수집
 - 모니터 스펙정보: 매일 03:00 KST에 수집
 - 키보드 스펙정보: 매일 04:00 KST에 수집
 - 노트북 스펙정보: 매일 12:00 KST에 수집
+- TV 스펙정보: 매일 05:00 KST에 수집
 
 사용하는 GitHub Actions는 아래와 같습니다.
 
 - [Update Danawa price CSV](.github/workflows/update-danawa-prices.yml)
 - [Update keyboard price CSV](.github/workflows/update-keyboard-prices.yml)
 - [Update laptop price CSV](.github/workflows/update-laptop-prices.yml)
+- [Update TV price CSV](.github/workflows/update-tv-prices.yml)
 - [Update monitor specs CSV](.github/workflows/update-monitor-specs.yml)
 - [Update keyboard specs CSV](.github/workflows/update-keyboard-specs.yml)
 - [Update laptop specs CSV](.github/workflows/update-laptop-specs.yml)
+- [Update TV specs CSV](.github/workflows/update-tv-specs.yml)
 
 CPU, 그래픽카드, 메인보드, RAM, SSD, HDD, 쿨러, 케이스, 파워는 아래 액션에서 한 번에 수집합니다.
 데스크탑은 같은 액션에서 수동으로만 돌릴 수 있습니다.
@@ -156,6 +174,12 @@ python scripts/crawl_danawa.py --category laptop --pages 300 --fail-on-empty --f
 
 노트북 가격 액션은 상품 수가 많아서 1-75, 76-150, 151-225, 226-300 페이지를 4개 파트로 나눠 병렬 수집한 뒤 하나의 CSV로 합칩니다.
 
+TV 가격 수집:
+
+```bash
+python scripts/crawl_danawa.py --category tv --fail-on-empty --fetcher requests --skip-combined
+```
+
 PC부품 가격 수집:
 
 ```bash
@@ -178,6 +202,12 @@ python scripts/crawl_keyboard_specs.py --workers 32 --timeout 20 --retries 3 --f
 
 ```bash
 python scripts/crawl_laptop_specs.py --workers 32 --timeout 20 --retries 3 --fail-on-error
+```
+
+TV 스펙 수집:
+
+```bash
+python scripts/crawl_tv_specs.py --workers 48 --timeout 15 --retries 2
 ```
 
 테스트:
@@ -205,5 +235,6 @@ python -m unittest discover -s tests
 - `cooler`: 쿨러
 - `case`: 케이스
 - `power`: 파워
+- `tv`: TV
 
-매일 자동 수집은 모니터, 키보드, 노트북, PC부품 가격만 켜두었습니다. 데스크탑은 수동 액션으로 돌리면 됩니다.
+매일 자동 수집은 모니터, 키보드, 노트북, TV, PC부품 가격만 켜두었습니다. 데스크탑은 수동 액션으로 돌리면 됩니다.

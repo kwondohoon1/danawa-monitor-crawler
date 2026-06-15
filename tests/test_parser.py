@@ -4,6 +4,7 @@ from danawa_crawler.core import Category, has_next_page, move_page_numbers, pars
 from danawa_crawler.keyboard_specs import extract_keyboard_specs
 from danawa_crawler.laptop_specs import parse_laptop_specs
 from danawa_crawler.monitor_specs import parse_monitor_specs
+from danawa_crawler.tv_specs import parse_tv_specs
 
 
 class ParserTests(unittest.TestCase):
@@ -232,6 +233,39 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(specs["ssd"], "3TB")
         self.assertIn("노트북", specs["full_spec"])
         self.assertEqual(specs["registration_month"], "2024/03")
+
+    def test_parse_tv_specs(self):
+        html = """
+        <div class="spec_list">
+          <div class="items">
+            <span>OLED TV</span> /
+            <span>65인치(163cm)</span> /
+            <span>4K UHD</span> /
+            <span>주사율</span>: <span>120Hz</span> /
+            <span>[화질]</span>
+            <span>HDR10</span> /
+            <span>돌비비전</span> /
+            <span>HLG</span> /
+            <span>게임모드</span> /
+            <span>[스마트]</span>
+            <span>넷플릭스</span> /
+            <span>유튜브</span> /
+            <span>미러링</span>
+          </div>
+        </div>
+        <div>등록월: 2026.04.</div>
+        """
+
+        specs = parse_tv_specs(html)
+
+        self.assertEqual(specs["screen_size"], "65인치(163cm)")
+        self.assertEqual(specs["display_type"], "OLED TV")
+        self.assertEqual(specs["resolution"], "4K UHD")
+        self.assertEqual(specs["refresh_rate"], "120Hz")
+        self.assertEqual(specs["hdr"], "HDR10 / 돌비비전 / HLG")
+        self.assertEqual(specs["smart_features"], "넷플릭스 / 유튜브 / 미러링")
+        self.assertIn("OLED TV", specs["full_spec"])
+        self.assertEqual(specs["registration_month"], "2026/04")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,58 @@
+name: Update TV specs CSV
+
+on:
+  schedule:
+    # 20:00 UTC = 05:00 KST
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: danawa-data-updates
+  cancel-in-progress: false
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m unittest discover -s tests
+
+      - name: Crawl TV specs
+        run: |
+          if [[ ! -f data/latest/tv.csv ]]; then
+            echo "No TV price CSV yet"
+            exit 0
+          fi
+          python scripts/crawl_tv_specs.py --workers 48 --timeout 15 --retries 2
+
+      - name: Commit CSV changes
+        run: |
+          if [[ -n "$(git status --porcelain data/specs/tv_specs.csv)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/specs/tv_specs.csv
+            git commit -m "Update TV specs CSV"
+            git pull --rebase origin main
+            git push
+          else
+            echo "No TV specs changes"
+          fi
