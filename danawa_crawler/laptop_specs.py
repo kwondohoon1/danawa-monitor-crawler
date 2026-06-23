@@ -151,7 +151,8 @@ def laptop_spec_tokens(html: str) -> list[str]:
 
 def labeled_value(full_spec: str, labels: Iterable[str], value_pattern: str, flags: int = re.I) -> str:
     for label in labels:
-        match = re.search(rf"{re.escape(label)}\s*:?\s*({value_pattern})", full_spec, flags)
+        label_pattern = rf"(?:\[{re.escape(label)}\]|{re.escape(label)})"
+        match = re.search(rf"{label_pattern}\s*:?\s*({value_pattern})", full_spec, flags)
         if match:
             return clean_spec_value(match.group(1))
     return ""

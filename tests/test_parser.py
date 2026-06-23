@@ -234,6 +234,23 @@ class ParserTests(unittest.TestCase):
         self.assertIn("노트북", specs["full_spec"])
         self.assertEqual(specs["registration_month"], "2024/03")
 
+    def test_parse_laptop_ram_after_bracket_label(self):
+        html = """
+        <div class="spec_list">
+          <div class="items">
+            <span>노트북</span> /
+            <span>[CPU]</span> <span>인텔</span> /
+            <span>[그래픽]</span> <span>내장그래픽</span> /
+            <span>[램]</span> <span>16GB</span> /
+            <span>용량</span>: <span>1TB</span>
+          </div>
+        </div>
+        """
+
+        specs = parse_laptop_specs(html)
+
+        self.assertEqual(specs["ram"], "16GB")
+
     def test_parse_tv_specs(self):
         html = """
         <div class="spec_list">
