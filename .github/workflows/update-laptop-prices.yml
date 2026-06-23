@@ -14,9 +14,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  test:
+  crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 90
 
     steps:
       - name: Checkout
@@ -36,90 +36,8 @@ jobs:
       - name: Run tests
         run: python -m unittest discover -s tests
 
-  crawl:
-    needs: test
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - part: 1
-            page_start: 1
-            page_end: 75
-          - part: 2
-            page_start: 76
-            page_end: 150
-          - part: 3
-            page_start: 151
-            page_end: 225
-          - part: 4
-            page_start: 226
-            page_end: 300
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "pip"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Crawl laptop prices part ${{ matrix.part }}
-        run: >
-          python scripts/crawl_danawa.py
-          --category laptop
-          --page-start ${{ matrix.page_start }}
-          --page-end ${{ matrix.page_end }}
-          --fail-on-empty
-          --fetcher requests
-          --delay 0.05
-          --skip-combined
-          --output data-part-${{ matrix.part }}
-
-      - name: Upload laptop price part
-        uses: actions/upload-artifact@v4
-        with:
-          name: laptop-price-part-${{ matrix.part }}
-          path: data-part-${{ matrix.part }}/latest/laptop.csv
-          if-no-files-found: error
-          retention-days: 1
-
-  merge:
-    needs: crawl
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "pip"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Download laptop price parts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: laptop-price-part-*
-          path: laptop-price-parts
-
-      - name: Merge laptop price parts
-        run: python scripts/merge_price_parts.py --category laptop --input-dir laptop-price-parts --output data
+      - name: Crawl laptop prices
+        run: python scripts/crawl_laptop_prices.py --fail-on-empty --max-pages-per-maker 2 --workers 24 --delay 0.02
 
       - name: Commit CSV changes
         run: |

@@ -215,7 +215,7 @@ def category_page_url(category: Category, page: int, list_count: int) -> str:
 def fetch_with_requests(session: requests.Session, url: str, timeout: int) -> str:
     response = session.get(url, timeout=timeout)
     response.raise_for_status()
-    if not response.encoding:
+    if not response.encoding or response.encoding.lower() == "iso-8859-1":
         response.encoding = response.apparent_encoding
     return response.text
 

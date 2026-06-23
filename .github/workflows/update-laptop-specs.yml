@@ -42,7 +42,7 @@ jobs:
             echo "No laptop price CSV yet"
             exit 0
           fi
-          python scripts/crawl_laptop_specs.py --workers 32 --timeout 20 --retries 3 --fail-on-error
+          python scripts/crawl_laptop_specs.py --workers 48 --timeout 15 --retries 2 --fail-on-error
 
       - name: Commit CSV changes
         run: |

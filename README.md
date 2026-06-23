@@ -86,15 +86,30 @@ product_code,product_name,2026-05-19,2026-05-18,2026-05-17,...
 
 노트북 스펙:
 
+- 브랜드
 - 인치
 - 무게
 - 운영체제
 - 해상도
 - 주사율
+- 패널
 - CPU
+- CPU 브랜드
+- CPU 모델
+- CPU 코어
+- NPU
 - 그래픽
+- 그래픽 구분
+- 그래픽 모델
+- 그래픽 메모리
 - 램
+- 램 종류
+- 램 슬롯
 - SSD
+- 저장장치 슬롯
+- 무선
+- 배터리
+- 단자
 - 전체정보
 - 등록년월
 
@@ -169,10 +184,11 @@ python scripts/crawl_danawa.py --category keyboard --fail-on-empty --fetcher req
 노트북 가격 수집:
 
 ```bash
-python scripts/crawl_danawa.py --category laptop --pages 300 --fail-on-empty --fetcher requests
+python scripts/crawl_laptop_prices.py --fail-on-empty --max-pages-per-maker 2 --workers 24
 ```
 
-노트북 가격 액션은 상품 수가 많아서 1-75, 76-150, 151-225, 226-300 페이지를 4개 파트로 나눠 병렬 수집한 뒤 하나의 CSV로 합칩니다.
+노트북은 상품 수가 많아서 전체 목록을 수집하지 않습니다.
+ACER, ASUS, DELL, GIGABYTE, MSI, LENOVO, HP, 삼성, LG만 제조사 필터로 수집하고, 브랜드별 2페이지를 병렬로 가져옵니다.
 
 TV 가격 수집:
 
@@ -201,7 +217,7 @@ python scripts/crawl_keyboard_specs.py --workers 32 --timeout 20 --retries 3 --f
 노트북 스펙 수집:
 
 ```bash
-python scripts/crawl_laptop_specs.py --workers 32 --timeout 20 --retries 3 --fail-on-error
+python scripts/crawl_laptop_specs.py --workers 48 --timeout 15 --retries 2 --fail-on-error
 ```
 
 TV 스펙 수집:
