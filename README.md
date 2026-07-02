@@ -59,6 +59,7 @@ product_code,product_name,2026-05-19,2026-05-18,2026-05-17,...
 
 각 파일에는 `product_code`, `product_name`, `first_collected_date`를 저장합니다.
 `first_collected_date`는 다나와 등록월이 아니라 이 저장소에서 상품을 처음 확인한 날짜입니다.
+기능 적용 전에 이미 수집 중이던 상품은 신제품 CSV에 넣지 않습니다.
 한번 기록된 상품은 목록에서 사라졌다가 다시 나타나도 최초 날짜를 그대로 유지합니다.
 
 ## 스펙정보 바로가기

@@ -1,18 +1,21 @@
 from __future__ import annotations
 
 import csv
-import re
 from pathlib import Path
 
 
-DATE_FIELD = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 NEW_PRODUCT_FIELDS = ["product_code", "product_name", "first_collected_date"]
+KNOWN_PRODUCT_FIELDS = ["product_code", "product_name"]
 
 
 def _read_latest(path: Path) -> tuple[str, dict[str, str]]:
     with path.open("r", encoding="utf-8-sig", newline="") as file:
         reader = csv.DictReader(file)
-        date_fields = [field for field in (reader.fieldnames or []) if DATE_FIELD.match(field)]
+        date_fields = [
+            field
+            for field in (reader.fieldnames or [])
+            if len(field) == 10 and field[4] == "-" and field[7] == "-"
+        ]
         if not date_fields:
             raise ValueError(f"No collection date found in {path}")
 
@@ -22,26 +25,6 @@ def _read_latest(path: Path) -> tuple[str, dict[str, str]]:
             if row.get("product_code", "").strip()
         }
     return max(date_fields), products
-
-
-def _read_first_seen_from_history(path: Path) -> dict[str, str]:
-    if not path.exists():
-        return {}
-
-    with path.open("r", encoding="utf-8-sig", newline="") as file:
-        reader = csv.DictReader(file)
-        date_fields = sorted(field for field in (reader.fieldnames or []) if DATE_FIELD.match(field))
-        first_seen: dict[str, str] = {}
-        for row in reader:
-            product_code = row.get("product_code", "").strip()
-            if not product_code:
-                continue
-            for date_field in date_fields:
-                value = row.get(date_field, "").strip().replace(",", "")
-                if value.isdigit() and int(value) > 0:
-                    first_seen[product_code] = date_field
-                    break
-        return first_seen
 
 
 def _read_registry(path: Path) -> dict[str, dict[str, str]]:
@@ -60,27 +43,41 @@ def _read_registry(path: Path) -> dict[str, dict[str, str]]:
         }
 
 
+def _read_known_products(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+
+    with path.open("r", encoding="utf-8-sig", newline="") as file:
+        return {
+            row["product_code"].strip(): row.get("product_name", "").strip()
+            for row in csv.DictReader(file)
+            if row.get("product_code", "").strip()
+        }
+
+
 def update_new_products(output_dir: Path, category: str) -> tuple[int, int]:
     latest_path = output_dir / "latest" / f"{category}.csv"
-    history_path = output_dir / "history" / f"{category}_price_history.csv"
     registry_path = output_dir / "new_products" / f"{category}.csv"
+    known_path = output_dir / "state" / "known_products" / f"{category}.csv"
 
     collected_date, current_products = _read_latest(latest_path)
-    registry = _read_registry(registry_path)
-    history_first_seen = _read_first_seen_from_history(history_path) if not registry else {}
+    initializing = not known_path.exists()
+    known_products = _read_known_products(known_path)
+    registry = {} if initializing else _read_registry(registry_path)
 
     added = 0
     for product_code, product_name in current_products.items():
+        if product_code not in known_products and not initializing:
+            registry[product_code] = {
+                "product_code": product_code,
+                "product_name": product_name,
+                "first_collected_date": collected_date,
+            }
+            added += 1
+
+        known_products[product_code] = product_name
         if product_code in registry:
             registry[product_code]["product_name"] = product_name
-            continue
-
-        registry[product_code] = {
-            "product_code": product_code,
-            "product_name": product_name,
-            "first_collected_date": history_first_seen.get(product_code, collected_date),
-        }
-        added += 1
 
     rows = sorted(
         registry.values(),
@@ -92,5 +89,14 @@ def update_new_products(output_dir: Path, category: str) -> tuple[int, int]:
         writer = csv.DictWriter(file, fieldnames=NEW_PRODUCT_FIELDS)
         writer.writeheader()
         writer.writerows(rows)
+
+    known_path.parent.mkdir(parents=True, exist_ok=True)
+    with known_path.open("w", encoding="utf-8-sig", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=KNOWN_PRODUCT_FIELDS)
+        writer.writeheader()
+        writer.writerows(
+            {"product_code": code, "product_name": name}
+            for code, name in sorted(known_products.items())
+        )
 
     return added, len(rows)

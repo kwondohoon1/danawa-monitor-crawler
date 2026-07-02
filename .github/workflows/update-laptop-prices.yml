@@ -44,10 +44,10 @@ jobs:
 
       - name: Commit CSV changes
         run: |
-          if [[ -n "$(git status --porcelain data/latest/laptop.csv data/history/laptop_price_history.csv data/new_products/laptop.csv)" ]]; then
+          if [[ -n "$(git status --porcelain data/latest/laptop.csv data/history/laptop_price_history.csv data/new_products/laptop.csv data/state/known_products/laptop.csv)" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add data/latest/laptop.csv data/history/laptop_price_history.csv data/new_products/laptop.csv
+            git add data/latest/laptop.csv data/history/laptop_price_history.csv data/new_products/laptop.csv data/state/known_products/laptop.csv
             git commit -m "Update laptop price CSV"
             git pull --rebase origin main
             git push

@@ -44,10 +44,10 @@ jobs:
 
       - name: Commit CSV changes
         run: |
-          if [[ -n "$(git status --porcelain data/latest/keyboard.csv data/history/keyboard_price_history.csv data/new_products/keyboard.csv)" ]]; then
+          if [[ -n "$(git status --porcelain data/latest/keyboard.csv data/history/keyboard_price_history.csv data/new_products/keyboard.csv data/state/known_products/keyboard.csv)" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add data/latest/keyboard.csv data/history/keyboard_price_history.csv data/new_products/keyboard.csv
+            git add data/latest/keyboard.csv data/history/keyboard_price_history.csv data/new_products/keyboard.csv data/state/known_products/keyboard.csv
             git commit -m "Update keyboard price CSV"
             git pull --rebase origin main
             git push
