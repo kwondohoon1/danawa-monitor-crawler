@@ -41,6 +41,26 @@ product_code,product_name,2026-05-19,2026-05-18,2026-05-17,...
 
 60일 기록 CSV는 파일 하나에 최근 60일만 저장합니다. 60일이 지난 날짜 열은 다음 업데이트 때 자동으로 빠집니다.
 
+## 신제품 수집일 바로가기
+
+- [모니터 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/new_products/monitor.csv)
+- [키보드 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/new_products/keyboard.csv)
+- [노트북 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/new_products/laptop.csv)
+- [TV 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/new_products/tv.csv)
+- [CPU 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/new_products/cpu.csv)
+- [그래픽카드 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/new_products/gpu.csv)
+- [메인보드 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/new_products/motherboard.csv)
+- [RAM 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/new_products/ram.csv)
+- [SSD 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/new_products/ssd.csv)
+- [HDD 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/new_products/hdd.csv)
+- [쿨러 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/new_products/cooler.csv)
+- [케이스 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/new_products/case.csv)
+- [파워 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/new_products/power.csv)
+
+각 파일에는 `product_code`, `product_name`, `first_collected_date`를 저장합니다.
+`first_collected_date`는 다나와 등록월이 아니라 이 저장소에서 상품을 처음 확인한 날짜입니다.
+한번 기록된 상품은 목록에서 사라졌다가 다시 나타나도 최초 날짜를 그대로 유지합니다.
+
 ## 스펙정보 바로가기
 
 - [모니터 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/raw/main/data/specs/monitor_specs.csv)

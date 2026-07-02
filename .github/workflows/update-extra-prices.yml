@@ -71,6 +71,8 @@ jobs:
 
           python scripts/crawl_danawa.py "${args[@]}" --fail-on-empty --fetcher requests --max-pages 100 --delay 0.1 --skip-combined
 
+          python scripts/update_new_products.py "${args[@]}"
+
       - name: Commit CSV changes
         run: |
           if [[ "$TARGET_CATEGORY" == "all" ]]; then
@@ -83,7 +85,7 @@ jobs:
 
           paths=()
           for category in "${categories[@]}"; do
-            paths+=("data/latest/${category}.csv" "data/history/${category}_price_history.csv")
+            paths+=("data/latest/${category}.csv" "data/history/${category}_price_history.csv" "data/new_products/${category}.csv")
           done
 
           if [[ -n "$(git status --porcelain -- "${paths[@]}")" ]]; then
