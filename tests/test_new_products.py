@@ -21,7 +21,7 @@ class NewProductsTests(unittest.TestCase):
             write_csv(
                 output_dir / "latest" / "monitor.csv",
                 ["product_code", "product_name", "2026-07-02"],
-                [{"product_code": "100", "product_name": "Alpha", "2026-07-02": "200"}],
+                [{"product_code": "122000100", "product_name": "Alpha", "2026-07-02": "200"}],
             )
 
             added, total = update_new_products(output_dir, "monitor")
@@ -35,7 +35,7 @@ class NewProductsTests(unittest.TestCase):
                 "r", encoding="utf-8-sig", newline=""
             ) as file:
                 row = next(csv.DictReader(file))
-            self.assertEqual(row["product_code"], "100")
+            self.assertEqual(row["product_code"], "122000100")
 
     def test_registry_only_adds_unseen_codes_and_keeps_missing_products(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -45,8 +45,8 @@ class NewProductsTests(unittest.TestCase):
                 output_dir / "state" / "known_products" / "monitor.csv",
                 ["product_code", "product_name"],
                 [
-                    {"product_code": "100", "product_name": "Old name"},
-                    {"product_code": "999", "product_name": "No longer listed"},
+                    {"product_code": "122000100", "product_name": "Old name"},
+                    {"product_code": "122000999", "product_name": "No longer listed"},
                 ],
             )
             write_csv(
@@ -54,7 +54,7 @@ class NewProductsTests(unittest.TestCase):
                 ["product_code", "product_name", "first_collected_date"],
                 [
                     {
-                        "product_code": "100",
+                        "product_code": "122000100",
                         "product_name": "Old name",
                         "first_collected_date": "2026-07-01",
                     },
@@ -64,8 +64,8 @@ class NewProductsTests(unittest.TestCase):
                 output_dir / "latest" / "monitor.csv",
                 ["product_code", "product_name", "2026-07-02"],
                 [
-                    {"product_code": "100", "product_name": "Exact name", "2026-07-02": "200"},
-                    {"product_code": "200", "product_name": "New product", "2026-07-02": "300"},
+                    {"product_code": "122000100", "product_name": "Exact name", "2026-07-02": "200"},
+                    {"product_code": "122000200", "product_name": "New product", "2026-07-02": "300"},
                 ],
             )
 
@@ -74,14 +74,46 @@ class NewProductsTests(unittest.TestCase):
             self.assertEqual((added, total), (1, 2))
             with registry_path.open("r", encoding="utf-8-sig", newline="") as file:
                 rows = {row["product_code"]: row for row in csv.DictReader(file)}
-            self.assertEqual(rows["100"]["product_name"], "Exact name")
-            self.assertEqual(rows["100"]["first_collected_date"], "2026-07-01")
-            self.assertEqual(rows["200"]["first_collected_date"], "2026-07-02")
+            self.assertEqual(rows["122000100"]["product_name"], "Exact name")
+            self.assertEqual(rows["122000100"]["first_collected_date"], "2026-07-01")
+            self.assertEqual(rows["122000200"]["first_collected_date"], "2026-07-02")
             with (output_dir / "state" / "known_products" / "monitor.csv").open(
                 "r", encoding="utf-8-sig", newline=""
             ) as file:
                 known_codes = {row["product_code"] for row in csv.DictReader(file)}
-            self.assertEqual(known_codes, {"100", "200", "999"})
+            self.assertEqual(known_codes, {"122000100", "122000200", "122000999"})
+
+    def test_old_used_and_overseas_products_are_excluded_but_remembered(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_dir = Path(tmp_dir)
+            write_csv(
+                output_dir / "state" / "known_products" / "monitor.csv",
+                ["product_code", "product_name"],
+                [],
+            )
+            write_csv(
+                output_dir / "latest" / "monitor.csv",
+                ["product_code", "product_name", "2026-07-03"],
+                [
+                    {"product_code": "121999999", "product_name": "Old product", "2026-07-03": "100"},
+                    {"product_code": "122000001", "product_name": "Recent (중고)", "2026-07-03": "100"},
+                    {"product_code": "122000002", "product_name": "Recent 해외 구매", "2026-07-03": "100"},
+                    {"product_code": "122000003", "product_name": "Recent new", "2026-07-03": "100"},
+                ],
+            )
+
+            added, total = update_new_products(output_dir, "monitor")
+
+            self.assertEqual((added, total), (1, 1))
+            with (output_dir / "new_products" / "monitor.csv").open(
+                "r", encoding="utf-8-sig", newline=""
+            ) as file:
+                rows = list(csv.DictReader(file))
+            self.assertEqual(rows[0]["product_code"], "122000003")
+            with (output_dir / "state" / "known_products" / "monitor.csv").open(
+                "r", encoding="utf-8-sig", newline=""
+            ) as file:
+                self.assertEqual(len(list(csv.DictReader(file))), 4)
 
 
 if __name__ == "__main__":

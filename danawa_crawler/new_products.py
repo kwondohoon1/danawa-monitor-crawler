@@ -6,6 +6,15 @@ from pathlib import Path
 
 NEW_PRODUCT_FIELDS = ["product_code", "product_name", "first_collected_date"]
 KNOWN_PRODUCT_FIELDS = ["product_code", "product_name"]
+MIN_NEW_PRODUCT_CODE = 122_000_000
+EXCLUDED_NAME_KEYWORDS = ("중고", "해외구매")
+
+
+def is_new_product_candidate(product_code: str, product_name: str) -> bool:
+    if not product_code.isdigit() or int(product_code) < MIN_NEW_PRODUCT_CODE:
+        return False
+    compact_name = "".join(product_name.split())
+    return not any(keyword in compact_name for keyword in EXCLUDED_NAME_KEYWORDS)
 
 
 def _read_latest(path: Path) -> tuple[str, dict[str, str]]:
@@ -64,10 +73,16 @@ def update_new_products(output_dir: Path, category: str) -> tuple[int, int]:
     initializing = not known_path.exists()
     known_products = _read_known_products(known_path)
     registry = {} if initializing else _read_registry(registry_path)
+    registry = {
+        code: row
+        for code, row in registry.items()
+        if is_new_product_candidate(code, row["product_name"])
+    }
 
     added = 0
     for product_code, product_name in current_products.items():
-        if product_code not in known_products and not initializing:
+        eligible = is_new_product_candidate(product_code, product_name)
+        if product_code not in known_products and not initializing and eligible:
             registry[product_code] = {
                 "product_code": product_code,
                 "product_name": product_name,
@@ -77,7 +92,10 @@ def update_new_products(output_dir: Path, category: str) -> tuple[int, int]:
 
         known_products[product_code] = product_name
         if product_code in registry:
-            registry[product_code]["product_name"] = product_name
+            if eligible:
+                registry[product_code]["product_name"] = product_name
+            else:
+                del registry[product_code]
 
     rows = sorted(
         registry.values(),
