@@ -97,11 +97,7 @@ def update_new_products(output_dir: Path, category: str) -> tuple[int, int]:
             else:
                 del registry[product_code]
 
-    rows = sorted(
-        registry.values(),
-        key=lambda row: (row["first_collected_date"], row["product_code"]),
-        reverse=True,
-    )
+    rows = list(registry.values())
     registry_path.parent.mkdir(parents=True, exist_ok=True)
     with registry_path.open("w", encoding="utf-8-sig", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=NEW_PRODUCT_FIELDS)

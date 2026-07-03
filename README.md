@@ -7,19 +7,19 @@ CPU, 그래픽카드, 메인보드, RAM, SSD, HDD, 쿨러, 케이스, 파워는 
 
 ## 가격정보 바로가기
 
-- [monitor.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/monitor.csv)
-- [keyboard.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/keyboard.csv)
-- [laptop.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/laptop.csv)
-- [tv.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/tv.csv)
-- [cpu.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/cpu.csv)
-- [gpu.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/gpu.csv)
-- [motherboard.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/motherboard.csv)
-- [ram.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/ram.csv)
-- [ssd.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/ssd.csv)
-- [hdd.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/hdd.csv)
-- [cooler.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/cooler.csv)
-- [case.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/case.csv)
-- [power.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/power.csv)
+- [모니터 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/monitor.csv)
+- [키보드 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/keyboard.csv)
+- [노트북 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/laptop.csv)
+- [TV 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/tv.csv)
+- [CPU 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/cpu.csv)
+- [그래픽카드 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/gpu.csv)
+- [메인보드 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/motherboard.csv)
+- [RAM 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/ram.csv)
+- [SSD 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/ssd.csv)
+- [HDD 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/hdd.csv)
+- [쿨러 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/cooler.csv)
+- [케이스 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/case.csv)
+- [파워 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/power.csv)
 
 가격 CSV는 아래처럼 단순하게 저장됩니다.
 
@@ -43,32 +43,33 @@ product_code,product_name,2026-05-19,2026-05-18,2026-05-17,...
 
 ## 신제품 수집일 바로가기
 
-- [monitor.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/monitor.csv)
-- [keyboard.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/keyboard.csv)
-- [laptop.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/laptop.csv)
-- [tv.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/tv.csv)
-- [cpu.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/cpu.csv)
-- [gpu.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/gpu.csv)
-- [motherboard.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/motherboard.csv)
-- [ram.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/ram.csv)
-- [ssd.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/ssd.csv)
-- [hdd.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/hdd.csv)
-- [cooler.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/cooler.csv)
-- [case.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/case.csv)
-- [power.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/power.csv)
+- [모니터 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/monitor.csv)
+- [키보드 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/keyboard.csv)
+- [노트북 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/laptop.csv)
+- [TV 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/tv.csv)
+- [CPU 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/cpu.csv)
+- [그래픽카드 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/gpu.csv)
+- [메인보드 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/motherboard.csv)
+- [RAM 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/ram.csv)
+- [SSD 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/ssd.csv)
+- [HDD 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/hdd.csv)
+- [쿨러 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/cooler.csv)
+- [케이스 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/case.csv)
+- [파워 신제품](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/new_products/power.csv)
 
 각 파일에는 `product_code`, `product_name`, `first_collected_date`를 저장합니다.
 `first_collected_date`는 다나와 등록월이 아니라 이 저장소에서 상품을 처음 확인한 날짜입니다.
 기능 적용 전에 이미 수집 중이던 상품은 신제품 CSV에 넣지 않습니다.
 한번 기록된 상품은 목록에서 사라졌다가 다시 나타나도 최초 날짜를 그대로 유지합니다.
 상품코드가 `122000000` 이상인 상품만 기록하며, 상품명에 `중고` 또는 `해외구매`가 있으면 제외합니다.
+새로 발견된 상품은 기존 기록 아래쪽에 계속 추가됩니다.
 
 ## 스펙정보 바로가기
 
-- [monitor_specs.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/monitor_specs.csv)
-- [keyboard_specs.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/keyboard_specs.csv)
-- [laptop_specs.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/laptop_specs.csv)
-- [tv_specs.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/tv_specs.csv)
+- [모니터 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/monitor_specs.csv)
+- [키보드 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/keyboard_specs.csv)
+- [노트북 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/laptop_specs.csv)
+- [TV 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/tv_specs.csv)
 
 스펙 CSV는 각 가격 CSV에 있는 상품코드 순서대로 수집합니다.
 
@@ -148,19 +149,19 @@ TV 스펙:
 
 ## History 바로가기
 
-- [monitor_price_history.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/monitor_price_history.csv)
-- [keyboard_price_history.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/keyboard_price_history.csv)
-- [laptop_price_history.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/laptop_price_history.csv)
-- [tv_price_history.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/tv_price_history.csv)
-- [cpu_price_history.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/cpu_price_history.csv)
-- [gpu_price_history.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/gpu_price_history.csv)
-- [motherboard_price_history.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/motherboard_price_history.csv)
-- [ram_price_history.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/ram_price_history.csv)
-- [ssd_price_history.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/ssd_price_history.csv)
-- [hdd_price_history.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/hdd_price_history.csv)
-- [cooler_price_history.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/cooler_price_history.csv)
-- [case_price_history.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/case_price_history.csv)
-- [power_price_history.csv](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/power_price_history.csv)
+- [모니터 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/monitor_price_history.csv)
+- [키보드 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/keyboard_price_history.csv)
+- [노트북 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/laptop_price_history.csv)
+- [TV 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/tv_price_history.csv)
+- [CPU 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/cpu_price_history.csv)
+- [그래픽카드 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/gpu_price_history.csv)
+- [메인보드 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/motherboard_price_history.csv)
+- [RAM 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/ram_price_history.csv)
+- [SSD 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/ssd_price_history.csv)
+- [HDD 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/hdd_price_history.csv)
+- [쿨러 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/cooler_price_history.csv)
+- [케이스 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/case_price_history.csv)
+- [파워 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/power_price_history.csv)
 
 ## 자동 업데이트
 

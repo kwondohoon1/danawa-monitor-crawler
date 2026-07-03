@@ -73,7 +73,12 @@ class NewProductsTests(unittest.TestCase):
 
             self.assertEqual((added, total), (1, 2))
             with registry_path.open("r", encoding="utf-8-sig", newline="") as file:
-                rows = {row["product_code"]: row for row in csv.DictReader(file)}
+                ordered_rows = list(csv.DictReader(file))
+                rows = {row["product_code"]: row for row in ordered_rows}
+            self.assertEqual(
+                [row["product_code"] for row in ordered_rows],
+                ["122000100", "122000200"],
+            )
             self.assertEqual(rows["122000100"]["product_name"], "Exact name")
             self.assertEqual(rows["122000100"]["first_collected_date"], "2026-07-01")
             self.assertEqual(rows["122000200"]["first_collected_date"], "2026-07-02")
