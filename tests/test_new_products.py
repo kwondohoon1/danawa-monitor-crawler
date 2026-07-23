@@ -124,92 +124,160 @@ class NewProductsTests(unittest.TestCase):
 SPEC_FIELDS = ["product_code", "product_name", "registration_month", "fetch_status"]
 
 
+def read_rows(path: Path) -> list[dict[str, str]]:
+    with path.open("r", encoding="utf-8-sig", newline="") as file:
+        return list(csv.DictReader(file))
+
+
 class SpecBasedNewProductsTests(unittest.TestCase):
-    def test_monitor_registry_is_rebuilt_from_registration_month_window(self):
+    def test_monitor_records_only_unseen_products_registered_within_window(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             output_dir = Path(tmp_dir)
             write_csv(
+                output_dir / "state" / "known_products" / "monitor.csv",
+                ["product_code", "product_name"],
+                [{"product_code": "1", "product_name": "Seen before"}],
+            )
+            write_csv(
                 output_dir / "latest" / "monitor.csv",
                 ["product_code", "product_name", "2026-07-22"],
-                [{"product_code": "100", "product_name": "In window", "2026-07-22": "100"}],
+                [
+                    {"product_code": "1", "product_name": "Seen before", "2026-07-22": "100"},
+                    {"product_code": "2", "product_name": "Unseen recent", "2026-07-22": "100"},
+                    {"product_code": "3", "product_name": "Unseen old", "2026-07-22": "100"},
+                    {"product_code": "4", "product_name": "Unseen no spec yet", "2026-07-22": "100"},
+                    {"product_code": "5", "product_name": "Unseen recent (중고)", "2026-07-22": "100"},
+                ],
             )
             write_csv(
                 output_dir / "specs" / "monitor_specs.csv",
                 SPEC_FIELDS,
                 [
-                    {"product_code": "100", "product_name": "In window", "registration_month": "2026/07", "fetch_status": "ok"},
-                    {"product_code": "101", "product_name": "Edge of window", "registration_month": "2026/05", "fetch_status": "ok"},
-                    {"product_code": "102", "product_name": "Too old", "registration_month": "2026/04", "fetch_status": "ok"},
-                    {"product_code": "103", "product_name": "No month", "registration_month": "", "fetch_status": "error"},
-                    {"product_code": "104", "product_name": "Recent (중고)", "registration_month": "2026/07", "fetch_status": "ok"},
-                    {"product_code": "105", "product_name": "Recent 해외 구매", "registration_month": "2026/07", "fetch_status": "ok"},
+                    {"product_code": "1", "product_name": "Seen before", "registration_month": "2026/07", "fetch_status": "ok"},
+                    {"product_code": "2", "product_name": "Unseen recent", "registration_month": "2026/07", "fetch_status": "ok"},
+                    {"product_code": "3", "product_name": "Unseen old", "registration_month": "2026/04", "fetch_status": "ok"},
+                    {"product_code": "5", "product_name": "Unseen recent (중고)", "registration_month": "2026/07", "fetch_status": "ok"},
                 ],
             )
 
             added, total = update_new_products(output_dir, "monitor")
 
-            self.assertEqual((added, total), (2, 2))
-            with (output_dir / "new_products" / "monitor.csv").open(
-                "r", encoding="utf-8-sig", newline=""
-            ) as file:
-                rows = list(csv.DictReader(file))
-            self.assertEqual({row["product_code"] for row in rows}, {"100", "101"})
-            self.assertTrue(all(row["first_collected_date"] == "2026-07-22" for row in rows))
+            self.assertEqual((added, total), (1, 1))
+            rows = read_rows(output_dir / "new_products" / "monitor.csv")
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["product_code"], "2")
+            self.assertEqual(rows[0]["first_collected_date"], "2026-07-22")
+            self.assertEqual(rows[0]["registration_month"], "2026/07")
+            known_codes = {
+                row["product_code"]
+                for row in read_rows(output_dir / "state" / "known_products" / "monitor.csv")
+            }
+            # 스펙이 아직 없는 4번은 known에 올리지 않고 다음 실행에서 재평가한다.
+            self.assertEqual(known_codes, {"1", "2", "3", "5"})
 
-    def test_monitor_rebuild_keeps_first_collected_date_and_drops_expired(self):
+    def test_monitor_pending_product_is_recorded_once_spec_appears(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             output_dir = Path(tmp_dir)
             write_csv(
+                output_dir / "state" / "known_products" / "monitor.csv",
+                ["product_code", "product_name"],
+                [],
+            )
+            write_csv(
                 output_dir / "latest" / "monitor.csv",
                 ["product_code", "product_name", "2026-07-22"],
-                [{"product_code": "100", "product_name": "Still new", "2026-07-22": "100"}],
+                [{"product_code": "7", "product_name": "Brand new", "2026-07-22": "100"}],
+            )
+            write_csv(output_dir / "specs" / "monitor_specs.csv", SPEC_FIELDS, [])
+
+            added, total = update_new_products(output_dir, "monitor")
+            self.assertEqual((added, total), (0, 0))
+
+            write_csv(
+                output_dir / "latest" / "monitor.csv",
+                ["product_code", "product_name", "2026-07-23", "2026-07-22"],
+                [{"product_code": "7", "product_name": "Brand new", "2026-07-23": "100", "2026-07-22": "100"}],
+            )
+            write_csv(
+                output_dir / "specs" / "monitor_specs.csv",
+                SPEC_FIELDS,
+                [{"product_code": "7", "product_name": "Brand new", "registration_month": "2026/07", "fetch_status": "ok"}],
+            )
+
+            added, total = update_new_products(output_dir, "monitor")
+
+            self.assertEqual((added, total), (1, 1))
+            rows = read_rows(output_dir / "new_products" / "monitor.csv")
+            self.assertEqual(rows[0]["product_code"], "7")
+            self.assertEqual(rows[0]["first_collected_date"], "2026-07-23")
+
+    def test_monitor_registry_expires_by_registration_month_and_keeps_dates(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_dir = Path(tmp_dir)
+            write_csv(
+                output_dir / "state" / "known_products" / "monitor.csv",
+                ["product_code", "product_name"],
+                [
+                    {"product_code": "10", "product_name": "Old name"},
+                    {"product_code": "20", "product_name": "Expired"},
+                    {"product_code": "30", "product_name": "No reg info"},
+                ],
             )
             write_csv(
                 output_dir / "new_products" / "monitor.csv",
-                ["product_code", "product_name", "first_collected_date"],
+                ["product_code", "product_name", "first_collected_date", "registration_month"],
                 [
-                    {"product_code": "100", "product_name": "Old name", "first_collected_date": "2026-07-01"},
-                    {"product_code": "200", "product_name": "Expired", "first_collected_date": "2026-04-05"},
+                    {"product_code": "10", "product_name": "Old name", "first_collected_date": "2026-07-01", "registration_month": ""},
+                    {"product_code": "20", "product_name": "Expired", "first_collected_date": "2026-04-05", "registration_month": "2026/03"},
+                    {"product_code": "30", "product_name": "No reg info", "first_collected_date": "2026-07-02", "registration_month": ""},
                 ],
+            )
+            write_csv(
+                output_dir / "latest" / "monitor.csv",
+                ["product_code", "product_name", "2026-07-22"],
+                [{"product_code": "10", "product_name": "Renamed", "2026-07-22": "100"}],
             )
             write_csv(
                 output_dir / "specs" / "monitor_specs.csv",
                 SPEC_FIELDS,
-                [
-                    {"product_code": "100", "product_name": "Still new", "registration_month": "2026/06", "fetch_status": "ok"},
-                    {"product_code": "200", "product_name": "Expired", "registration_month": "2026/02", "fetch_status": "ok"},
-                ],
+                [{"product_code": "10", "product_name": "Renamed", "registration_month": "2026/06", "fetch_status": "ok"}],
             )
 
             added, total = update_new_products(output_dir, "monitor")
 
-            self.assertEqual((added, total), (0, 1))
-            with (output_dir / "new_products" / "monitor.csv").open(
-                "r", encoding="utf-8-sig", newline=""
-            ) as file:
-                rows = list(csv.DictReader(file))
-            self.assertEqual(len(rows), 1)
-            self.assertEqual(rows[0]["product_code"], "100")
-            self.assertEqual(rows[0]["product_name"], "Still new")
-            self.assertEqual(rows[0]["first_collected_date"], "2026-07-01")
+            self.assertEqual((added, total), (0, 2))
+            rows = {row["product_code"]: row for row in read_rows(output_dir / "new_products" / "monitor.csv")}
+            # 20번은 저장된 등록년월이 3개월 밖이라 스펙에서 사라졌어도 만료된다.
+            self.assertEqual(set(rows), {"10", "30"})
+            self.assertEqual(rows["10"]["product_name"], "Renamed")
+            self.assertEqual(rows["10"]["first_collected_date"], "2026-07-01")
+            self.assertEqual(rows["10"]["registration_month"], "2026/06")
+            # 등록년월을 알 수 없는 항목은 판단할 근거가 없으므로 유지한다.
+            self.assertEqual(rows["30"]["first_collected_date"], "2026-07-02")
 
-    def test_monitor_rebuild_does_not_touch_known_products_state(self):
+    def test_monitor_initial_run_creates_baseline_without_new_products(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             output_dir = Path(tmp_dir)
             write_csv(
                 output_dir / "latest" / "monitor.csv",
                 ["product_code", "product_name", "2026-07-22"],
-                [{"product_code": "100", "product_name": "New", "2026-07-22": "100"}],
+                [{"product_code": "100", "product_name": "Already listed", "2026-07-22": "100"}],
             )
             write_csv(
                 output_dir / "specs" / "monitor_specs.csv",
                 SPEC_FIELDS,
-                [{"product_code": "100", "product_name": "New", "registration_month": "2026/07", "fetch_status": "ok"}],
+                [{"product_code": "100", "product_name": "Already listed", "registration_month": "2026/07", "fetch_status": "ok"}],
             )
 
-            update_new_products(output_dir, "monitor")
+            added, total = update_new_products(output_dir, "monitor")
 
-            self.assertFalse((output_dir / "state" / "known_products" / "monitor.csv").exists())
+            self.assertEqual((added, total), (0, 0))
+            self.assertEqual(read_rows(output_dir / "new_products" / "monitor.csv"), [])
+            known_codes = {
+                row["product_code"]
+                for row in read_rows(output_dir / "state" / "known_products" / "monitor.csv")
+            }
+            self.assertEqual(known_codes, {"100"})
 
 
 if __name__ == "__main__":

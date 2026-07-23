@@ -6,6 +6,7 @@ from pathlib import Path
 
 
 NEW_PRODUCT_FIELDS = ["product_code", "product_name", "first_collected_date"]
+SPEC_NEW_PRODUCT_FIELDS = NEW_PRODUCT_FIELDS + ["registration_month"]
 KNOWN_PRODUCT_FIELDS = ["product_code", "product_name"]
 MIN_NEW_PRODUCT_CODE = 122_000_000
 EXCLUDED_NAME_KEYWORDS = ("중고", "해외구매")
@@ -39,12 +40,6 @@ def _recent_registration_months(collected_date: str) -> set[str]:
     return months
 
 
-def _is_recent_registration(registration_month: str, allowed_months: set[str]) -> bool:
-    if not _REGISTRATION_MONTH_PATTERN.match(registration_month):
-        return False
-    return registration_month in allowed_months
-
-
 def _read_latest(path: Path) -> tuple[str, dict[str, str]]:
     with path.open("r", encoding="utf-8-sig", newline="") as file:
         reader = csv.DictReader(file)
@@ -74,6 +69,7 @@ def _read_registry(path: Path) -> dict[str, dict[str, str]]:
                 "product_code": row["product_code"].strip(),
                 "product_name": row.get("product_name", "").strip(),
                 "first_collected_date": row.get("first_collected_date", "").strip(),
+                "registration_month": (row.get("registration_month") or "").strip(),
             }
             for row in csv.DictReader(file)
             if row.get("product_code", "").strip()
@@ -104,52 +100,93 @@ def _read_specs(path: Path) -> dict[str, dict[str, str]]:
         }
 
 
-def rebuild_new_products_from_specs(output_dir: Path, category: str) -> tuple[int, int]:
+def _update_spec_backed_new_products(output_dir: Path, category: str) -> tuple[int, int]:
     latest_path = output_dir / "latest" / f"{category}.csv"
     specs_path = output_dir / "specs" / f"{category}_specs.csv"
     registry_path = output_dir / "new_products" / f"{category}.csv"
+    known_path = output_dir / "state" / "known_products" / f"{category}.csv"
 
-    collected_date, _ = _read_latest(latest_path)
+    collected_date, current_products = _read_latest(latest_path)
     allowed_months = _recent_registration_months(collected_date)
-    previous_registry = _read_registry(registry_path)
     specs = _read_specs(specs_path)
+    initializing = not known_path.exists()
+    known_products = _read_known_products(known_path)
+    previous_registry = {} if initializing else _read_registry(registry_path)
 
-    rows = []
-    added = 0
-    for product_code, spec in sorted(
-        specs.items(),
-        key=lambda item: (item[1]["registration_month"], item[0]),
-        reverse=True,
-    ):
-        if not _is_recent_registration(spec["registration_month"], allowed_months):
+    # 기존 항목 갱신: 등록년월이 3개월 윈도우를 벗어나면 만료 처리한다.
+    registry: dict[str, dict[str, str]] = {}
+    for product_code, row in previous_registry.items():
+        spec = specs.get(product_code)
+        registration_month = ""
+        if spec and _REGISTRATION_MONTH_PATTERN.match(spec["registration_month"]):
+            registration_month = spec["registration_month"]
+        elif _REGISTRATION_MONTH_PATTERN.match(row.get("registration_month", "")):
+            registration_month = row["registration_month"]
+        if registration_month and registration_month not in allowed_months:
             continue
-        if _has_excluded_keyword(spec["product_name"]):
-            continue
-        previous = previous_registry.get(product_code)
-        if previous is None:
-            added += 1
-        rows.append(
-            {
-                "product_code": product_code,
-                "product_name": spec["product_name"],
-                "first_collected_date": previous["first_collected_date"]
-                if previous and previous["first_collected_date"]
-                else collected_date,
-            }
+        product_name = (
+            current_products.get(product_code)
+            or (spec["product_name"] if spec else "")
+            or row["product_name"]
         )
+        if _has_excluded_keyword(product_name):
+            continue
+        registry[product_code] = {
+            "product_code": product_code,
+            "product_name": product_name,
+            "first_collected_date": row["first_collected_date"] or collected_date,
+            "registration_month": registration_month,
+        }
+
+    # 새로 발견된 상품: 스펙(등록년월)이 확인된 뒤에만 known에 올려서,
+    # 스펙이 하루 늦게 도착해도 신제품 판정을 놓치지 않게 한다.
+    added = 0
+    for product_code, product_name in current_products.items():
+        if product_code in known_products:
+            known_products[product_code] = product_name
+            continue
+        if initializing:
+            known_products[product_code] = product_name
+            continue
+        spec = specs.get(product_code)
+        if spec is None or not _REGISTRATION_MONTH_PATTERN.match(spec["registration_month"]):
+            continue
+        known_products[product_code] = product_name
+        registration_month = spec["registration_month"]
+        if (
+            registration_month in allowed_months
+            and not _has_excluded_keyword(product_name)
+            and product_code not in registry
+        ):
+            registry[product_code] = {
+                "product_code": product_code,
+                "product_name": product_name,
+                "first_collected_date": collected_date,
+                "registration_month": registration_month,
+            }
+            added += 1
 
     registry_path.parent.mkdir(parents=True, exist_ok=True)
     with registry_path.open("w", encoding="utf-8-sig", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=NEW_PRODUCT_FIELDS)
+        writer = csv.DictWriter(file, fieldnames=SPEC_NEW_PRODUCT_FIELDS)
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(registry.values())
 
-    return added, len(rows)
+    known_path.parent.mkdir(parents=True, exist_ok=True)
+    with known_path.open("w", encoding="utf-8-sig", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=KNOWN_PRODUCT_FIELDS)
+        writer.writeheader()
+        writer.writerows(
+            {"product_code": code, "product_name": name}
+            for code, name in sorted(known_products.items())
+        )
+
+    return added, len(registry)
 
 
 def update_new_products(output_dir: Path, category: str) -> tuple[int, int]:
     if category in SPEC_BACKED_CATEGORIES:
-        return rebuild_new_products_from_specs(output_dir, category)
+        return _update_spec_backed_new_products(output_dir, category)
 
     latest_path = output_dir / "latest" / f"{category}.csv"
     registry_path = output_dir / "new_products" / f"{category}.csv"
@@ -186,7 +223,7 @@ def update_new_products(output_dir: Path, category: str) -> tuple[int, int]:
     rows = list(registry.values())
     registry_path.parent.mkdir(parents=True, exist_ok=True)
     with registry_path.open("w", encoding="utf-8-sig", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=NEW_PRODUCT_FIELDS)
+        writer = csv.DictWriter(file, fieldnames=NEW_PRODUCT_FIELDS, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
 
