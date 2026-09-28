@@ -76,6 +76,9 @@ product_code,product_name,2026-05-19,2026-05-18,2026-05-17,...
 - [키보드 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/keyboard_specs.csv)
 - [노트북 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/laptop_specs.csv)
 - [TV 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/tv_specs.csv)
+- [그래픽카드 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/gpu_specs.csv)
+- [RAM 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/ram_specs.csv)
+- [SSD 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/ssd_specs.csv)
 
 스펙 CSV는 각 가격 CSV에 있는 상품코드 순서대로 수집합니다.
 
@@ -189,6 +192,7 @@ TV 스펙:
 - [Update keyboard specs CSV](.github/workflows/update-keyboard-specs.yml)
 - [Update laptop specs CSV](.github/workflows/update-laptop-specs.yml)
 - [Update TV specs CSV](.github/workflows/update-tv-specs.yml)
+- [Update component specs CSV](.github/workflows/update-component-specs.yml)
 
 CPU, 그래픽카드, 메인보드, RAM, SSD, HDD, 쿨러, 케이스, 파워는 아래 액션에서 한 번에 수집합니다.
 데스크탑은 같은 액션에서 수동으로만 돌릴 수 있습니다.
@@ -253,6 +257,14 @@ TV 스펙 수집:
 
 ```bash
 python scripts/crawl_tv_specs.py --workers 48 --timeout 15 --retries 2
+```
+
+그래픽카드 / RAM / SSD 스펙 수집:
+
+```bash
+python scripts/crawl_component_specs.py --category gpu --workers 32 --timeout 20 --retries 3
+python scripts/crawl_component_specs.py --category ram --workers 32 --timeout 20 --retries 3
+python scripts/crawl_component_specs.py --category ssd --workers 32 --timeout 20 --retries 3
 ```
 
 테스트:
