@@ -174,13 +174,16 @@ TV 스펙:
 
 ## 자동 업데이트
 
-- 모니터/키보드/노트북 가격정보: 매일 07:00 KST에 수집
+- 모니터 가격정보: 매일 06:00 KST에 수집
+- 키보드/노트북 가격정보: 매일 07:00 KST에 수집
+- 그래픽카드/RAM/SSD 가격정보: 매일 07:00 KST에 수집
 - TV 가격정보: 매일 07:30 KST에 수집
-- PC부품 가격정보: 매일 08:30 KST에 수집
-- 모니터 스펙정보: 매일 03:00 KST에 수집
+- 그 외 PC부품 가격정보(CPU, 메인보드, HDD, 쿨러, 케이스, 파워): 매일 08:30 KST에 수집
+- 모니터 스펙정보: 매일 06:30 KST에 수집
 - 키보드 스펙정보: 매일 04:00 KST에 수집
 - 노트북 스펙정보: 매일 12:00 KST에 수집
 - TV 스펙정보: 매일 05:00 KST에 수집
+- 그래픽카드/RAM/SSD 스펙정보: 매일 07:30 KST에 수집
 
 사용하는 GitHub Actions는 아래와 같습니다.
 
@@ -194,9 +197,10 @@ TV 스펙:
 - [Update TV specs CSV](.github/workflows/update-tv-specs.yml)
 - [Update component specs CSV](.github/workflows/update-component-specs.yml)
 
-CPU, 그래픽카드, 메인보드, RAM, SSD, HDD, 쿨러, 케이스, 파워는 아래 액션에서 한 번에 수집합니다.
+그래픽카드, RAM, SSD 가격은 별도 액션에서, CPU, 메인보드, HDD, 쿨러, 케이스, 파워는 아래 액션에서 한 번에 수집합니다.
 데스크탑은 같은 액션에서 수동으로만 돌릴 수 있습니다.
 
+- [Update GPU RAM SSD price CSV](.github/workflows/update-component-prices.yml)
 - [Update extra Danawa price CSV](.github/workflows/update-extra-prices.yml)
 
 ## 직접 실행

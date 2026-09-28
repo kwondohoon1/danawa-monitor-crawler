@@ -1,9 +1,9 @@
-name: Update extra Danawa price CSV
+name: Update GPU RAM SSD price CSV
 
 on:
   schedule:
-    # 23:30 UTC = 08:30 KST
-    - cron: "30 23 * * *"
+    # 22:00 UTC = 07:00 KST
+    - cron: "0 22 * * *"
   workflow_dispatch:
     inputs:
       category:
@@ -13,16 +13,9 @@ on:
         type: choice
         options:
           - all
-          - desktop
-          - cpu
           - gpu
-          - motherboard
           - ram
           - ssd
-          - hdd
-          - cooler
-          - case
-          - power
 
 permissions:
   contents: write
@@ -59,7 +52,7 @@ jobs:
       - name: Crawl selected category prices
         run: |
           if [[ "$TARGET_CATEGORY" == "all" ]]; then
-            categories=(cpu motherboard hdd cooler case power)
+            categories=(gpu ram ssd)
           else
             categories=("$TARGET_CATEGORY")
           fi
@@ -76,8 +69,8 @@ jobs:
       - name: Commit CSV changes
         run: |
           if [[ "$TARGET_CATEGORY" == "all" ]]; then
-            categories=(cpu motherboard hdd cooler case power)
-            commit_message="Update PC parts price CSV"
+            categories=(gpu ram ssd)
+            commit_message="Update GPU RAM SSD price CSV"
           else
             categories=("$TARGET_CATEGORY")
             commit_message="Update Danawa ${TARGET_CATEGORY} price CSV"

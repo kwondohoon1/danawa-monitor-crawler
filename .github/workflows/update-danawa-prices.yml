@@ -2,8 +2,8 @@ name: Update Danawa price CSV
 
 on:
   schedule:
-    # 22:00 UTC = 07:00 KST
-    - cron: "0 22 * * *"
+    # 21:00 UTC = 06:00 KST
+    - cron: "0 21 * * *"
   workflow_dispatch:
 
 permissions:
