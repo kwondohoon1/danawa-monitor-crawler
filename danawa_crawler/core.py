@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import math
 import re
 import sys
@@ -333,6 +334,126 @@ def parse_danawa_context(html: str) -> DanawaListContext:
         sort_method=selected_sort_method(soup),
         total_count=total_count,
     )
+
+
+NEXT_FLIGHT_CHUNK = re.compile(r'self\.__next_f\.push\(\[1,"((?:\\.|[^"\\])*)"\]\)')
+CONTEXT_FETCH_ATTEMPTS = 5
+
+
+def next_flight_text(html: str) -> str:
+    return "".join(json.loads(f'"{chunk}"') for chunk in NEXT_FLIGHT_CHUNK.findall(html))
+
+
+def json_object_after(text: str, key: str) -> dict | None:
+    decoder = json.JSONDecoder()
+    marker = f'"{key}":'
+    start = 0
+    while True:
+        index = text.find(marker, start)
+        if index < 0:
+            return None
+        try:
+            value, _ = decoder.raw_decode(text, index + len(marker))
+        except ValueError:
+            value = None
+        if isinstance(value, dict):
+            return value
+        start = index + len(marker)
+
+
+def context_from_next_page(html: str) -> DanawaListContext:
+    """Build the legacy Ajax context from Danawa's Next.js list page."""
+    text = next_flight_text(html)
+    origin = json_object_after(text, "originCategory")
+    physics = json_object_after(text, "physicsCategory") or {}
+    current = json_object_after(text, "currentCategory") or {}
+    if not origin or not str(origin.get("code", "")).isdigit():
+        raise CrawlerError("Could not find originCategory in Danawa Next.js list page")
+
+    origin_code = str(origin["code"])
+    category_code = origin_code[3:]
+    hierarchy_match = re.search(r'"uiCategoryHierarchyCodes":\[([^\]]*)\]', text)
+    hierarchy = re.findall(r"\d+", hierarchy_match.group(1)) if hierarchy_match else []
+    list_category_code = hierarchy[-1] if hierarchy else category_code
+    total_match = re.search(r'"totalCount":(\d+),"currentPage"', text)
+    mapping_match = re.search(r'"categoryMappingCode":"(\d*)"', text)
+    keyword_match = re.search(r'"powerLinkKeyword":"((?:\\.|[^"\\])*)"', text)
+
+    def physics_value(key: str) -> str:
+        return str(physics.get(key) or "0")
+
+    return DanawaListContext(
+        category_code=category_code,
+        list_category_code=list_category_code,
+        physics_cate1=physics_value("physicsCate1"),
+        physics_cate2=physics_value("physicsCate2"),
+        physics_cate3=physics_value("physicsCate3"),
+        physics_cate4=physics_value("physicsCate4"),
+        group=str(current.get("group") or origin.get("group") or origin_code[:2]),
+        depth=str(current.get("depth") or origin.get("depth") or origin_code[2]),
+        power_link_keyword=json.loads(f'"{keyword_match.group(1)}"') if keyword_match else "",
+        current_category_code="",
+        category_mapping_code=mapping_match.group(1) if mapping_match else "",
+        package_type="1",
+        package_limit="5",
+        price_unit="0",
+        price_unit_value="0",
+        price_unit_class="",
+        cm_recommend_sort="N",
+        cm_recommend_sort_default="N",
+        bundle_image_preview="Y",
+        maker_display_yn="Y",
+        discount_product_rate="0",
+        initial_price_display="N",
+        dpg_zone_category="N",
+        assembly_gallery_category="N",
+        quick_delivery_category_yn="N",
+        quick_delivery_display="",
+        price_unit_sort="N",
+        price_unit_sort_order="A",
+        simple_description_display_yn="Y",
+        simple_description_open="Y",
+        mall_min_price_display_yn="",
+        product_list_api="search",
+        dnw_switch_yn="",
+        add_delivery="N",
+        coupang_member_sort="",
+        coupang_member_sort_layer_type="",
+        sort_method="BEST",
+        total_count=int(total_match.group(1)) if total_match else None,
+    )
+
+
+def parse_list_context(html: str) -> DanawaListContext:
+    if "oGlobalSetting" in html:
+        return parse_danawa_context(html)
+    if "self.__next_f" in html:
+        return context_from_next_page(html)
+    raise CrawlerError("Danawa list page has neither legacy oGlobalSetting nor Next.js data")
+
+
+def category_context_url(category: Category, list_count: int) -> str:
+    # /list/ is A/B routed to the Next.js frontend; /list/index.php still serves the legacy page.
+    parts = urlparse(category_page_url(category, 1, list_count))
+    return urlunparse(parts._replace(path="/list/index.php"))
+
+
+def fetch_list_context(category: Category, list_count: int, timeout: int) -> DanawaListContext:
+    urls = [category_context_url(category, list_count), category_page_url(category, 1, list_count)]
+    last_error: Exception | None = None
+    for attempt in range(CONTEXT_FETCH_ATTEMPTS):
+        url = urls[attempt % len(urls)]
+        # Danawa pins the frontend variant to the TCP connection, so every attempt uses a fresh session.
+        session = make_session()
+        try:
+            return parse_list_context(fetch_with_requests(session, url, timeout))
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            print(f"[{category.slug}] list context attempt {attempt + 1} failed ({url}): {exc}")
+        finally:
+            session.close()
+        time.sleep(min(5.0, 1.0 + attempt))
+    raise CrawlerError(f"Could not load Danawa list context for {category.name}: {last_error}")
 
 
 def ajax_payload(context: DanawaListContext, page: int, list_count: int) -> dict[str, str | int]:
@@ -830,8 +951,7 @@ def crawl_category_by_price(
     timeout: int,
 ) -> list[Product]:
     referer_url = category_page_url(category, 1, list_count)
-    initial_html = fetch_with_requests(session, referer_url, timeout)
-    context = parse_danawa_context(initial_html)
+    context = fetch_list_context(category, list_count, timeout)
     if context.total_count:
         print(f"[{category.slug}] Danawa reports {context.total_count:,} products before price splitting")
 
@@ -973,8 +1093,7 @@ def crawl_category(
         if fetcher in {"auto", "requests"}:
             try:
                 if page == 1 or context is None:
-                    initial_html = fetch_with_requests(session, source_url, timeout)
-                    context = parse_danawa_context(initial_html)
+                    context = fetch_list_context(category, list_count, timeout)
                     if context.total_count:
                         expected_pages = max(1, math.ceil(context.total_count / list_count))
                         print(

@@ -14,12 +14,11 @@ from danawa_crawler.core import (
     Product,
     ajax_payload,
     category_page_url,
-    fetch_with_requests,
+    fetch_list_context,
     has_next_page,
     make_session,
     merge_products,
     now_kst_iso,
-    parse_danawa_context,
     parse_products,
     write_history,
     write_latest,
@@ -171,9 +170,8 @@ def crawl_laptop_prices(
 ) -> int:
     collected_at = now_kst_iso()
     collected_date = collected_at[:10]
-    session = make_session()
     referer_url = category_page_url(LAPTOP_CATEGORY, 1, list_count)
-    context = parse_danawa_context(fetch_with_requests(session, referer_url, timeout))
+    context = fetch_list_context(LAPTOP_CATEGORY, list_count, timeout)
 
     products_by_code: dict[str, Product] = {}
 

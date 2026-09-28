@@ -17,6 +17,7 @@ from danawa_crawler.core import DEFAULT_USER_AGENT, normalize_space, now_kst_iso
 from danawa_crawler.monitor_specs import (
     clean_spec_value,
     first_matching,
+    has_spec_container,
     join_tokens,
     section_tokens,
     value_tokens,
@@ -194,6 +195,11 @@ def fetch_one(item: TvInput, collected_at: str, timeout: int, retries: int) -> d
             response.raise_for_status()
             specs = parse_tv_specs(response.text)
             if not specs["full_spec"]:
+                if has_spec_container(response.text):
+                    # The page loaded but Danawa lists no specs for this product.
+                    row = empty_row(item, collected_at, "no_spec")
+                    row.update(specs)
+                    return row
                 raise ValueError("spec_list not found")
             row = empty_row(item, collected_at, "ok")
             row.update(specs)
@@ -236,7 +242,7 @@ def crawl_tv_specs(
                 print(f"tv specs: {done}/{len(items)}")
 
     ordered = [row for row in results if row is not None]
-    errors = sum(1 for row in ordered if row["fetch_status"] != "ok")
+    errors = sum(1 for row in ordered if row["fetch_status"] == "error")
     write_csv(output_path, ordered)
     return len(ordered), errors
 

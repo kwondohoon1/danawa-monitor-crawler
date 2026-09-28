@@ -94,6 +94,11 @@ def load_monitor_inputs(path: Path, limit: int | None = None) -> list[MonitorInp
     return rows
 
 
+def has_spec_container(html: str) -> bool:
+    """True when the product page has a spec block, even an empty one."""
+    return BeautifulSoup(html, "html.parser").select_one(".spec_list") is not None
+
+
 def spec_tokens(html: str) -> list[str]:
     soup = BeautifulSoup(html, "html.parser")
     spec = soup.select_one(".spec_list .items") or soup.select_one(".spec_list")
@@ -301,6 +306,11 @@ def fetch_one(item: MonitorInput, collected_at: str, timeout: int, retries: int)
             response.raise_for_status()
             specs = parse_monitor_specs(response.text)
             if not specs["full_spec"]:
+                if has_spec_container(response.text):
+                    # The page loaded but Danawa lists no specs for this product.
+                    row = empty_row(item, collected_at, "no_spec")
+                    row.update(specs)
+                    return row
                 raise ValueError("spec_list not found")
             if not specs["color"]:
                 specs["color"] = extract_color_from_text(item.product_name)
@@ -348,7 +358,7 @@ def crawl_monitor_specs(
                 print(f"monitor specs: {done}/{len(items)}")
 
     ordered = [row for row in results if row is not None]
-    errors = sum(1 for row in ordered if row["fetch_status"] != "ok")
+    errors = sum(1 for row in ordered if row["fetch_status"] == "error")
     write_csv(output_path, ordered)
     return len(ordered), errors
 

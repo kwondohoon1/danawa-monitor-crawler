@@ -14,7 +14,13 @@ from typing import Iterable
 import requests
 
 from danawa_crawler.core import DEFAULT_USER_AGENT, normalize_space
-from danawa_crawler.monitor_specs import join_tokens, parse_registration_month, spec_tokens, value_tokens
+from danawa_crawler.monitor_specs import (
+    has_spec_container,
+    join_tokens,
+    parse_registration_month,
+    spec_tokens,
+    value_tokens,
+)
 
 
 SPEC_FIELDS = [
@@ -290,6 +296,11 @@ def fetch_one(item: KeyboardInput, collected_at: str, timeout: int, retries: int
             response.raise_for_status()
             specs = extract_keyboard_specs(response.text, item.product_name)
             if not specs["full_spec"]:
+                if has_spec_container(response.text):
+                    # The page loaded but Danawa lists no specs for this product.
+                    row = empty_row(item, collected_at, "no_spec")
+                    row.update(specs)
+                    return row
                 raise ValueError("spec_list not found")
             row = empty_row(item, collected_at, "ok")
             row.update(specs)
@@ -332,7 +343,7 @@ def crawl_keyboard_specs(
                 print(f"keyboard specs: {done}/{len(items)}")
 
     ordered = [row for row in results if row is not None]
-    errors = sum(1 for row in ordered if row["fetch_status"] != "ok")
+    errors = sum(1 for row in ordered if row["fetch_status"] == "error")
     write_csv(output_path, ordered)
     return len(ordered), errors
 
