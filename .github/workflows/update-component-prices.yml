@@ -2,8 +2,8 @@ name: Update GPU RAM SSD price CSV
 
 on:
   schedule:
-    # 22:00 UTC = 07:00 KST
-    - cron: "0 22 * * *"
+    # Every hour, on the hour
+    - cron: "0 * * * *"
   workflow_dispatch:
     inputs:
       category:
@@ -21,13 +21,14 @@ permissions:
   contents: write
 
 concurrency:
-  group: danawa-data-updates
+  # Own group so hourly runs never cancel the queued daily workflows.
+  group: danawa-component-prices
   cancel-in-progress: false
 
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 50
     env:
       TARGET_CATEGORY: ${{ github.event_name == 'workflow_dispatch' && inputs.category || 'all' }}
 
@@ -86,8 +87,11 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add -- "${paths[@]}"
             git commit -m "$commit_message"
-            git pull --rebase origin main
-            git push
+            for attempt in 1 2 3 4 5; do
+              git pull --rebase origin main && git push && break
+              if [[ $attempt == 5 ]]; then exit 1; fi
+              sleep $((attempt * 10))
+            done
           else
             echo "No CSV changes"
           fi
