@@ -1,36 +1,30 @@
 name: Update GPU RAM SSD price CSV
 
+# 07:00-18:00 KST, every hour on the hour.
+# GitHub starts scheduled runs hours late, so the schedule below only wakes the runner up.
+# The runner stays alive, waits for each hour itself, and re-dispatches this workflow
+# before the 6-hour job limit. A run that finds the hour already collected just waits.
 on:
   schedule:
-    # Hourly 07:00-18:00 KST (22:00-09:00 UTC)
-    - cron: "0 0-9,22-23 * * *"
+    # xx:07 every hour 06:07-17:07 KST (21:07-08:07 UTC), a watchdog in case the chain stopped.
+    - cron: "7 0-8,21-23 * * *"
   workflow_dispatch:
-    inputs:
-      category:
-        description: "Category to crawl"
-        required: true
-        default: "all"
-        type: choice
-        options:
-          - all
-          - gpu
-          - ram
-          - ssd
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
-  # Own group so hourly runs never cancel the queued daily workflows.
-  group: danawa-component-prices
+  group: gpu-ram-ssd-hourly-prices
   cancel-in-progress: false
 
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 355
     env:
-      TARGET_CATEGORY: ${{ github.event_name == 'workflow_dispatch' && inputs.category || 'all' }}
+      TZ: Asia/Seoul
+      GH_TOKEN: ${{ github.token }}
 
     steps:
       - name: Checkout
@@ -50,48 +44,8 @@ jobs:
       - name: Run tests
         run: python -m unittest discover -s tests
 
-      - name: Crawl selected category prices
+      - name: Crawl prices every hour 07:00-18:00 KST
         run: |
-          if [[ "$TARGET_CATEGORY" == "all" ]]; then
-            categories=(gpu ram ssd)
-          else
-            categories=("$TARGET_CATEGORY")
-          fi
-
-          args=()
-          for category in "${categories[@]}"; do
-            args+=(--category "$category")
-          done
-
-          python scripts/crawl_danawa.py "${args[@]}" --fail-on-empty --fetcher requests --max-pages 100 --delay 0.1 --skip-combined
-
-          python scripts/update_new_products.py "${args[@]}"
-
-      - name: Commit CSV changes
-        run: |
-          if [[ "$TARGET_CATEGORY" == "all" ]]; then
-            categories=(gpu ram ssd)
-            commit_message="Update GPU RAM SSD price CSV"
-          else
-            categories=("$TARGET_CATEGORY")
-            commit_message="Update Danawa ${TARGET_CATEGORY} price CSV"
-          fi
-
-          paths=()
-          for category in "${categories[@]}"; do
-            paths+=("data/latest/${category}.csv" "data/history/${category}_price_history.csv" "data/new_products/${category}.csv" "data/state/known_products/${category}.csv")
-          done
-
-          if [[ -n "$(git status --porcelain -- "${paths[@]}")" ]]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -- "${paths[@]}"
-            git commit -m "$commit_message"
-            for attempt in 1 2 3 4 5; do
-              git pull --rebase origin main && git push && break
-              if [[ $attempt == 5 ]]; then exit 1; fi
-              sleep $((attempt * 10))
-            done
-          else
-            echo "No CSV changes"
-          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python scripts/run_hourly_component_prices.py --max-minutes 330

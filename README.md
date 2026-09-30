@@ -5,6 +5,29 @@ CPU, 그래픽카드, 메인보드, RAM, SSD, HDD, 쿨러, 케이스, 파워는 
 
 각 카테고리는 서로 다른 GitHub Actions에서 따로 수집합니다.
 
+<!-- hourly-prices:start -->
+## 그래픽카드 · RAM · SSD 시간대별 가격 (오늘: 2026-09-30)
+
+07:00~18:00 KST 매시 정각에 다나와 최저가를 수집합니다. 링크를 누르면 그 시간에 수집한 가격 CSV가 열립니다.
+
+[그래픽카드 오늘 시간대별 모아보기](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-09-30/gpu.csv) · [RAM 오늘 시간대별 모아보기](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-09-30/ram.csv) · [SSD 오늘 시간대별 모아보기](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-09-30/ssd.csv)
+
+| 시간 | 수집 시각 | 그래픽카드 | RAM | SSD |
+|---|---|---|---|---|
+| 07:00 | 대기 | — | — | — |
+| 08:00 | 대기 | — | — | — |
+| 09:00 | 09:49 | [860개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-09-30/gpu_09.csv) | [1,020개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-09-30/ram_09.csv) | [1,779개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-09-30/ssd_09.csv) |
+| 10:00 | 대기 | — | — | — |
+| 11:00 | 대기 | — | — | — |
+| 12:00 | 대기 | — | — | — |
+| 13:00 | 대기 | — | — | — |
+| 14:00 | 대기 | — | — | — |
+| 15:00 | 대기 | — | — | — |
+| 16:00 | 대기 | — | — | — |
+| 17:00 | 대기 | — | — | — |
+| 18:00 | 대기 | — | — | — |
+<!-- hourly-prices:end -->
+
 ## 가격정보 바로가기
 
 - [모니터 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/monitor.csv)
@@ -176,7 +199,7 @@ TV 스펙:
 
 - 모니터 가격정보: 매일 06:00 KST에 수집
 - 키보드/노트북 가격정보: 매일 07:00 KST에 수집
-- 그래픽카드/RAM/SSD 가격정보: 07:00~18:00 KST 매시간 정각에 수집 (그날 가격 칸을 최신 값으로 갱신)
+- 그래픽카드/RAM/SSD 가격정보: 07:00~18:00 KST 매시간 정각에 수집 (그날 가격 칸을 최신 값으로 갱신, 시간대별 기록은 `data/hourly/날짜/`에 7일 보관)
 - TV 가격정보: 매일 07:30 KST에 수집
 - 그 외 PC부품 가격정보(CPU, 메인보드, HDD, 쿨러, 케이스, 파워): 매일 08:30 KST에 수집
 - 모니터 스펙정보: 매일 06:30 KST에 수집
