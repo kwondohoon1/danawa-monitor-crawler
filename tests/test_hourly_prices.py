@@ -103,14 +103,16 @@ class ReadmeTests(unittest.TestCase):
                 write_latest(output, category, day, {"1": "100"})
             record_hour(output, day, 7, "2026-09-30T07:00:04+09:00")
 
-            update_readme(readme, output, day)
-            update_readme(readme, output, day)
+            now = datetime(2026, 9, 30, 9, 30, tzinfo=KST)
+            update_readme(readme, output, day, now=now)
+            update_readme(readme, output, day, now=now)
             text = readme.read_text(encoding="utf-8")
 
             self.assertEqual(1, text.count(README_START))
             self.assertLess(text.index(README_END), text.index("## 가격정보 바로가기"))
             self.assertIn("| 07:00 | 07:00 | [1개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-09-30/gpu_07.csv)", text)
-            self.assertIn("| 08:00 | 대기 | — | — | — |", text)
+            self.assertIn("| 08:00 | 미수집 | — | — | — |", text)
+            self.assertIn("| 10:00 | 대기 | — | — | — |", text)
             self.assertIn("data/hourly/2026-09-30/ssd.csv", text)
 
 

@@ -125,7 +125,9 @@ def _link(path: Path, output_dir: Path, text: str) -> str:
     return f"[{text}]({REPO_BLOB_URL}/{relative})"
 
 
-def render_readme_section(output_dir: Path, today: str) -> str:
+def render_readme_section(output_dir: Path, today: str, now: datetime | None = None) -> str:
+    now = now or now_kst()
+    passed_hour = now.hour if now.date().isoformat() == today else (LAST_HOUR + 1 if today < now.date().isoformat() else -1)
     manifest = {(row["hour"], row["category"]): row for row in read_manifest(output_dir, today)}
     lines = [
         README_START,
@@ -148,7 +150,7 @@ def render_readme_section(output_dir: Path, today: str) -> str:
     for hour in range(FIRST_HOUR, LAST_HOUR + 1):
         key = f"{hour:02d}"
         collected = [manifest[(key, c)]["collected_at"] for c in HOURLY_CATEGORIES if (key, c) in manifest]
-        when = collected[0][11:16] if collected else "대기"
+        when = collected[0][11:16] if collected else ("미수집" if hour < passed_hour else "대기")
         cells = []
         for category in HOURLY_CATEGORIES:
             row = manifest.get((key, category))
@@ -178,9 +180,11 @@ def render_readme_section(output_dir: Path, today: str) -> str:
     return "\n".join(lines)
 
 
-def update_readme(readme: Path, output_dir: Path, today: str, insert_before: str = "## 가격정보 바로가기") -> None:
+def update_readme(
+    readme: Path, output_dir: Path, today: str, insert_before: str = "## 가격정보 바로가기", now: datetime | None = None
+) -> None:
     text = readme.read_text(encoding="utf-8")
-    section = render_readme_section(output_dir, today)
+    section = render_readme_section(output_dir, today, now)
     if README_START in text and README_END in text:
         start = text.index(README_START)
         end = text.index(README_END) + len(README_END)
