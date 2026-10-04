@@ -224,8 +224,9 @@ def fix_category(output_dir: Path, day: str, hour: int, category: str, fetch: Ca
             fixes[c["code"]] = str(c["clean"])
             results.append(log_row(c, str(c["clean"]), " ".join(f"{mall}:{value}" for value, mall in c["removed"])))
 
-    # 2차: 이번에 '혼자 튀는 가격'으로 여러 번 빠진 쇼핑몰(사기 의심)에서만 파는 상품이
-    # 같은 스펙 상품 중간값보다 크게 싸면 오늘 가격에서 뺀다 (비교할 다른 쇼핑몰이 없는 상품)
+    # 2차: 이번에 '혼자 튀는 가격'으로 여러 번 빠진 쇼핑몰(사기 의심)에서만 파는 상품은 비교할 다른 쇼핑몰이 없다.
+    # 이전 가격이 없는(새로 나타난) 상품이면 뺀다 — 사기 업체가 직접 올린 상품의 전형.
+    # 이전 가격이 있으면 같은 스펙 상품 중간값보다 15% 넘게 쌀 때만 뺀다.
     counts = Counter(mall for c in checked for _, mall in c["removed"])
     suspects = {mall for mall, n in counts.items() if n >= SUSPECT_MIN}
     if suspects:
@@ -237,15 +238,20 @@ def fix_category(output_dir: Path, day: str, hour: int, category: str, fetch: Ca
                 groups.setdefault(keys[code], []).append((code, price))
         for c in checked:
             key = keys.get(c["code"])
-            if c["code"] in fixes or not key or not c["kept"] or not c["kept"] <= suspects:
+            if c["code"] in fixes or not c["kept"] or not c["kept"] <= suspects:
                 continue
-            peers = sorted(price for code, price in groups.get(key, []) if code != c["code"])
+            malls = " ".join(f"{mall}:{c['price']}" for mall in sorted(c["kept"]))
+            if c["before"] is None:
+                fixes[c["code"]] = ""
+                results.append(log_row(c, "", f"{malls} (의심 쇼핑몰 단독 신규 상품)"))
+                continue
+            peers = sorted(price for code, price in groups.get(key, []) if code != c["code"]) if key else []
             if len(peers) < 5:
                 continue
             median = peers[len(peers) // 2]
             if c["price"] < median * OUTLIER_RATIO:
                 fixes[c["code"]] = ""
-                results.append(log_row(c, "", " ".join(f"{mall}:{c['price']}" for mall in sorted(c["kept"])) + f" (의심 쇼핑몰 단독, 같은 스펙 중간값 {median})"))
+                results.append(log_row(c, "", f"{malls} (의심 쇼핑몰 단독, 같은 스펙 중간값 {median})"))
 
     if fixes:
         _set_today(latest, day, fixes)

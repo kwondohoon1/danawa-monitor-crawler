@@ -101,20 +101,23 @@ class FixTests(unittest.TestCase):
             out = Path(tmp)
             header = ["product_code", "product_name", day, "2026-10-03"]
             rows = [[str(i), f"RTX 5080 상품{i}", "1500000", "2450000"] for i in range(1, 7)]          # 사기 가격 6개
-            rows += [["10", "사기 단독 상품", "1760000", ""], ["11", "정상가 단독 상품", "2380000", ""]]
+            rows += [["10", "사기 단독 상품", "1760000", "2400000"], ["11", "정상가 단독 상품", "2380000", "2390000"],
+                     ["12", "신규 단독 상품", "2180000", ""]]
             write_price_csv(out / "latest" / "gpu.csv", header, rows)
-            spec_rows = [["2026-10-04", str(i), "x", "u", "RTX 5080", "", "", "16GB"] for i in list(range(1, 7)) + [10, 11]]
+            spec_rows = [["2026-10-04", str(i), "x", "u", "RTX 5080", "", "", "16GB"] for i in list(range(1, 7)) + [10, 11, 12]]
             write_price_csv(out / "specs" / "gpu_specs.csv",
                             ["collected_at", "product_code", "product_name", "product_url", "chipset", "interface", "memory_type", "memory_size"], spec_rows)
             pages = {str(i): mall_page(mall_item("TH201", 1500000), mall_item("EE128", 2440000), mall_item("EE715", 2450000), mall_item("ED901", 2460000))
                      for i in range(1, 7)}
             pages["10"] = mall_page(mall_item("TH201", 1760000))
             pages["11"] = mall_page(mall_item("TH201", 2380000))
+            pages["12"] = mall_page(mall_item("TH201", 2180000))
             results = fix_price_outliers(out, day, 7, ["gpu"], fetch_factory=lambda category: pages.__getitem__)
             latest = {row["product_code"]: row[day] for row in read_rows(out / "latest" / "gpu.csv")}
             self.assertEqual("2440000", latest["1"])
             self.assertEqual("", latest["10"])         # 의심 쇼핑몰 단독 + 같은 스펙보다 크게 쌈 → 오늘 가격에서 뺌
-            self.assertEqual("2380000", latest["11"])  # 의심 쇼핑몰 단독이어도 정상 범위면 유지
+            self.assertEqual("2380000", latest["11"])  # 의심 쇼핑몰 단독이어도 이전 가격이 있고 정상 범위면 유지
+            self.assertEqual("", latest["12"])         # 의심 쇼핑몰 단독 신규 상품은 뺌
             dropped = [row for row in results if row["product_code"] == "10"][0]
             self.assertEqual("", dropped["fixed_price"])
 
