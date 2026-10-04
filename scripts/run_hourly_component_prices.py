@@ -27,6 +27,7 @@ from danawa_crawler.hourly_prices import (  # noqa: E402
     slot_done,
     update_readme,
 )
+from danawa_crawler.price_outliers import fix_price_outliers  # noqa: E402
 
 
 def run(command: list[str], check: bool = True) -> subprocess.CompletedProcess:
@@ -78,6 +79,11 @@ def collect(day: str, hour: int, categories: list[str], use_git: bool) -> None:
         print(f"{day} {hour:02d}:00 crawl failed; will retry at the next hour", flush=True)
         return
     output_dir = ROOT / "data"
+    try:
+        # 판매처 한 곳의 비정상 최저가(사기 의심)를 쇼핑몰별 가격으로 바로잡는다. 실패해도 수집은 계속
+        fix_price_outliers(output_dir, day, hour, categories)
+    except Exception as error:
+        print(f"price outlier check failed: {error}", flush=True)
     record_hour(output_dir, day, hour, collected_at, categories)
     removed = prune_old_days(output_dir, day)
     if removed:
