@@ -13,6 +13,7 @@ from __future__ import annotations
 import csv
 import re
 import time
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
@@ -23,6 +24,7 @@ from .core import make_session, write_csv
 CATE_CODES = {"gpu": "112753", "ram": "112752", "ssd": "112760"}
 DROP_RATIO = 0.85        # 직전 가격보다 15% 넘게 떨어지면 쇼핑몰 목록 확인
 OUTLIER_RATIO = 0.85     # 싼 쇼핑몰 5곳 중간값보다 15% 넘게 싸면 '혼자 튀는 가격'으로 제외
+SUSPECT_MIN = 5          # 한 번 수집에서 이만큼 '혼자 튀는 가격'으로 빠진 쇼핑몰은 사기 의심
 MAX_CHECKS = 600         # 카테고리당 한 번에 확인하는 상품 수 상한
 WORKERS = 6
 FIX_FIELDS = ["hour", "category", "product_code", "product_name", "crawled_price", "fixed_price", "baseline", "removed"]
@@ -72,6 +74,33 @@ def clean_lowest(prices: list[tuple[int, str]], baseline: int | None = None) -> 
     return kept[0][0], removed
 
 
+_DIGITS = re.compile(r"(\d{4,5})")
+
+
+def _norm(value: str) -> str:
+    return re.sub(r"\s+", "", str(value or "")).upper()
+
+
+def spec_keys(output_dir: Path, category: str) -> dict[str, str]:
+    """product_code -> 같은 스펙 묶음 키 (그래픽카드: 칩셋+VRAM, SSD: 폼팩터+인터페이스+용량, RAM: 세대+클럭+용량)."""
+    path = output_dir / "specs" / f"{category}_specs.csv"
+    if not path.exists():
+        return {}
+    keys = {}
+    with path.open("r", encoding="utf-8-sig", newline="") as file:
+        for row in csv.DictReader(file):
+            if category == "gpu":
+                parts = [row.get("chipset"), row.get("memory_size")]
+            elif category == "ssd":
+                parts = [row.get("form_factor"), row.get("interface"), row.get("capacity")]
+            else:
+                speed = _DIGITS.search(row.get("speed") or "")
+                parts = [row.get("generation"), speed.group(1) if speed else "", row.get("capacity")]
+            if all(_norm(part) for part in parts):
+                keys[row["product_code"]] = "|".join(_norm(part) for part in parts)
+    return keys
+
+
 def _int(value: str | None) -> int | None:
     try:
         number = int(str(value).strip())
@@ -116,7 +145,7 @@ def _write(path: Path, header: list[str], rows: list[list[str]]) -> None:
         writer.writerows(rows)
 
 
-def _set_today(path: Path, day: str, fixes: dict[str, int]) -> None:
+def _set_today(path: Path, day: str, fixes: dict[str, str]) -> None:
     if not path.exists():
         return
     header, rows = _read(path)
@@ -175,20 +204,54 @@ def fix_category(output_dir: Path, day: str, hour: int, category: str, fetch: Ca
             print(f"  {category} {code}: mall list failed ({error})", flush=True)
             return None
         clean, removed = clean_lowest(mall_prices, before)
-        if not clean or clean <= price:
-            return None
-        return {"hour": f"{hour:02d}", "category": category, "product_code": code, "product_name": name,
-                "crawled_price": str(price), "fixed_price": str(clean), "baseline": "" if before is None else str(before),
-                "removed": " ".join(f"{mall}:{value}" for value, mall in removed)}
+        kept_malls = {mall for value, mall in mall_prices if (value, mall) not in removed}
+        return {"code": code, "name": name, "price": price, "before": before, "clean": clean, "removed": removed, "kept": kept_malls}
 
     started = time.time()
     with ThreadPoolExecutor(max_workers=WORKERS) as pool:
-        results = [result for result in pool.map(check, candidates) if result]
-    fixes = {result["product_code"]: int(result["fixed_price"]) for result in results}
+        checked = [result for result in pool.map(check, candidates) if result]
+
+    def log_row(c, fixed: str, removed: str) -> dict[str, str]:
+        return {"hour": f"{hour:02d}", "category": category, "product_code": c["code"], "product_name": c["name"],
+                "crawled_price": str(c["price"]), "fixed_price": fixed, "baseline": "" if c["before"] is None else str(c["before"]),
+                "removed": removed}
+
+    # 1차: 같은 상품 안에서 다른 쇼핑몰보다 혼자 튀는 가격을 빼고 다음 최저가로
+    fixes: dict[str, str] = {}
+    results = []
+    for c in checked:
+        if c["clean"] and c["clean"] > c["price"]:
+            fixes[c["code"]] = str(c["clean"])
+            results.append(log_row(c, str(c["clean"]), " ".join(f"{mall}:{value}" for value, mall in c["removed"])))
+
+    # 2차: 이번에 '혼자 튀는 가격'으로 여러 번 빠진 쇼핑몰(사기 의심)에서만 파는 상품이
+    # 같은 스펙 상품 중간값보다 크게 싸면 오늘 가격에서 뺀다 (비교할 다른 쇼핑몰이 없는 상품)
+    counts = Counter(mall for c in checked for _, mall in c["removed"])
+    suspects = {mall for mall, n in counts.items() if n >= SUSPECT_MIN}
+    if suspects:
+        keys = spec_keys(output_dir, category)
+        today = {row[0]: _int(fixes.get(row[0], row[col] if col < len(row) else "")) for row in rows}
+        groups: dict[str, list[tuple[str, int]]] = {}
+        for code, price in today.items():
+            if price and keys.get(code):
+                groups.setdefault(keys[code], []).append((code, price))
+        for c in checked:
+            key = keys.get(c["code"])
+            if c["code"] in fixes or not key or not c["kept"] or not c["kept"] <= suspects:
+                continue
+            peers = sorted(price for code, price in groups.get(key, []) if code != c["code"])
+            if len(peers) < 5:
+                continue
+            median = peers[len(peers) // 2]
+            if c["price"] < median * OUTLIER_RATIO:
+                fixes[c["code"]] = ""
+                results.append(log_row(c, "", " ".join(f"{mall}:{c['price']}" for mall in sorted(c["kept"])) + f" (의심 쇼핑몰 단독, 같은 스펙 중간값 {median})"))
+
     if fixes:
         _set_today(latest, day, fixes)
         _set_today(output_dir / "history" / f"{category}_price_history.csv", day, fixes)
-    print(f"{category}: checked {len(candidates)} suspicious prices in {time.time() - started:.0f}s, fixed {len(fixes)}", flush=True)
+    print(f"{category}: checked {len(checked)} suspicious prices in {time.time() - started:.0f}s, fixed {len(fixes)}"
+          f"{' (suspect malls ' + ', '.join(sorted(suspects)) + ')' if suspects else ''}", flush=True)
     return results
 
 

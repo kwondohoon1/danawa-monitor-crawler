@@ -95,6 +95,29 @@ class FixTests(unittest.TestCase):
             self.assertEqual("2445900", log[0]["fixed_price"])
             self.assertEqual("TH201:1534160", log[0]["removed"])
 
+    def test_drops_single_mall_product_from_suspect_mall(self):
+        day = "2026-10-04"
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            header = ["product_code", "product_name", day, "2026-10-03"]
+            rows = [[str(i), f"RTX 5080 상품{i}", "1500000", "2450000"] for i in range(1, 7)]          # 사기 가격 6개
+            rows += [["10", "사기 단독 상품", "1760000", ""], ["11", "정상가 단독 상품", "2380000", ""]]
+            write_price_csv(out / "latest" / "gpu.csv", header, rows)
+            spec_rows = [["2026-10-04", str(i), "x", "u", "RTX 5080", "", "", "16GB"] for i in list(range(1, 7)) + [10, 11]]
+            write_price_csv(out / "specs" / "gpu_specs.csv",
+                            ["collected_at", "product_code", "product_name", "product_url", "chipset", "interface", "memory_type", "memory_size"], spec_rows)
+            pages = {str(i): mall_page(mall_item("TH201", 1500000), mall_item("EE128", 2440000), mall_item("EE715", 2450000), mall_item("ED901", 2460000))
+                     for i in range(1, 7)}
+            pages["10"] = mall_page(mall_item("TH201", 1760000))
+            pages["11"] = mall_page(mall_item("TH201", 2380000))
+            results = fix_price_outliers(out, day, 7, ["gpu"], fetch_factory=lambda category: pages.__getitem__)
+            latest = {row["product_code"]: row[day] for row in read_rows(out / "latest" / "gpu.csv")}
+            self.assertEqual("2440000", latest["1"])
+            self.assertEqual("", latest["10"])         # 의심 쇼핑몰 단독 + 같은 스펙보다 크게 쌈 → 오늘 가격에서 뺌
+            self.assertEqual("2380000", latest["11"])  # 의심 쇼핑몰 단독이어도 정상 범위면 유지
+            dropped = [row for row in results if row["product_code"] == "10"][0]
+            self.assertEqual("", dropped["fixed_price"])
+
     def test_failed_page_keeps_price(self):
         day = "2026-10-04"
         with tempfile.TemporaryDirectory() as tmp:
