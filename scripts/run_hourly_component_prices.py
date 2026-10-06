@@ -1,8 +1,9 @@
-"""Stay alive through 07:00-18:00 KST and crawl GPU/RAM/SSD prices at the top of every hour.
+"""Stay alive around the clock and crawl GPU/RAM/SSD prices at the top of every hour 07:00-18:00 KST.
 
-GitHub's scheduled runs start hours late, so the schedule only wakes this runner up; the runner
-itself waits for each hour, and hands over to a fresh run (workflow_dispatch) before the 6-hour
-job limit.
+GitHub's scheduled runs start hours late (the first morning run often after 09:00), so the runner
+never stops: it waits for each hour itself, keeps waiting through the night for tomorrow's 07:00,
+and hands over to a fresh run (workflow_dispatch) shortly before the 6-hour job limit.
+The schedule is only a watchdog that restarts the chain if it ever breaks.
 """
 
 import argparse
@@ -20,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 from danawa_crawler.hourly_prices import (  # noqa: E402
     HOURLY_CATEGORIES,
     current_slot,
-    next_slot,
+    next_collection,
     now_kst,
     prune_old_days,
     record_hour,
@@ -123,12 +124,19 @@ def main() -> int:
 
         if args.once:
             return 0
-        upcoming = next_slot(now_kst())
-        if upcoming is None:
+        upcoming = next_collection(now_kst())
+        if not use_git and upcoming.date() != now_kst().date():
             print("Today's 07:00-18:00 window is finished", flush=True)
             return 0
         if upcoming + timedelta(minutes=10) > deadline:
-            print(f"Handing over before {upcoming:%H:%M} (job time limit)", flush=True)
+            # 다음 수집이 이 실행의 시간 안에 안 들어오면, 시간 한도 직전까지 기다렸다가 새 실행에 넘긴다
+            # (밤새 체인을 이어 다음 날 07:00 에 이미 떠 있도록 — GitHub 예약 실행은 몇 시간씩 늦게 옴)
+            hand_at = deadline - timedelta(minutes=5)
+            wait = (hand_at - now_kst()).total_seconds()
+            if wait > 0:
+                print(f"Next collection {upcoming:%m-%d %H:%M}; waiting {wait / 60:.0f} min, then handing over", flush=True)
+                time.sleep(wait)
+            print(f"Handing over before {upcoming:%m-%d %H:%M} (job time limit)", flush=True)
             if use_git:
                 hand_over()
             return 0

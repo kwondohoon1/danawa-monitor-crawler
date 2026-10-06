@@ -8,6 +8,7 @@ from danawa_crawler.core import KST
 from danawa_crawler.hourly_prices import (
     README_END,
     README_START,
+    next_collection,
     next_slot,
     prune_old_days,
     record_hour,
@@ -29,6 +30,16 @@ def write_latest(output_dir: Path, category: str, day: str, prices: dict[str, st
 def read_rows(path: Path) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8-sig", newline="") as file:
         return list(csv.DictReader(file))
+
+
+class NextCollectionTests(unittest.TestCase):
+    def test_after_window_is_tomorrow_seven(self):
+        self.assertEqual(datetime(2026, 10, 6, 7, tzinfo=KST), next_collection(datetime(2026, 10, 5, 18, 5, tzinfo=KST)))
+        self.assertEqual(datetime(2026, 10, 6, 7, tzinfo=KST), next_collection(datetime(2026, 10, 5, 23, 50, tzinfo=KST)))
+
+    def test_inside_window_is_next_hour(self):
+        self.assertEqual(datetime(2026, 10, 6, 10, tzinfo=KST), next_collection(datetime(2026, 10, 6, 9, 30, tzinfo=KST)))
+        self.assertEqual(datetime(2026, 10, 6, 7, tzinfo=KST), next_collection(datetime(2026, 10, 6, 2, 0, tzinfo=KST)))
 
 
 class NextSlotTests(unittest.TestCase):

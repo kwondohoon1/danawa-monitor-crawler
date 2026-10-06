@@ -45,6 +45,15 @@ def next_slot(now: datetime) -> datetime | None:
     return candidate
 
 
+def next_collection(now: datetime) -> datetime:
+    """Next collection hour, today or (after 18:00) tomorrow at 07:00."""
+    upcoming = next_slot(now)
+    if upcoming is not None:
+        return upcoming
+    tomorrow = (now + timedelta(days=1)).replace(hour=FIRST_HOUR, minute=0, second=0, microsecond=0)
+    return tomorrow
+
+
 def current_slot(now: datetime) -> int | None:
     return now.hour if FIRST_HOUR <= now.hour <= LAST_HOUR else None
 
