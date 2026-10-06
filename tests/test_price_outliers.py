@@ -95,31 +95,65 @@ class FixTests(unittest.TestCase):
             self.assertEqual("2445900", log[0]["fixed_price"])
             self.assertEqual("TH201:1534160", log[0]["removed"])
 
-    def test_drops_single_mall_product_from_suspect_mall(self):
+    def test_market_based_fix_and_suspect_single_mall(self):
         day = "2026-10-04"
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
             header = ["product_code", "product_name", day, "2026-10-03"]
-            rows = [[str(i), f"RTX 5080 상품{i}", "1500000", "2450000"] for i in range(1, 7)]          # 사기 가격 6개
-            rows += [["10", "사기 단독 상품", "1760000", "2400000"], ["11", "정상가 단독 상품", "2380000", "2390000"],
-                     ["12", "신규 단독 상품", "2180000", ""]]
+            rows = [[str(i), f"RTX 5080 사기가 {i}", "1500000", "2450000"] for i in range(1, 6)]        # 사기 가격 5개
+            rows += [[str(i), f"RTX 5080 정상 {i}", str(2400000 + i * 10000), "2450000"] for i in range(6, 15)]
+            rows += [["20", "사기 단독 신규", "2180000", ""],          # 시세 범위지만 의심 쇼핑몰 단독 새 상품
+                     ["21", "11번가 단독 기존", "2380000", "2390000"],  # 의심 쇼핑몰 단독이어도 기존 상품·시세 범위
+                     ["22", "단독 사기가", "1600000", "2400000"]]       # 시세보다 크게 싼데 다른 쇼핑몰 없음 → 빼기
+            rows += [["23", "옥션 단독 구형", "1700000", "1710000"]]   # 시세보다 싸지만 일반 판매처 단독 → 유지
             write_price_csv(out / "latest" / "gpu.csv", header, rows)
-            spec_rows = [["2026-10-04", str(i), "x", "u", "RTX 5080", "", "", "16GB"] for i in list(range(1, 7)) + [10, 11, 12]]
+            codes = [row[0] for row in rows]
             write_price_csv(out / "specs" / "gpu_specs.csv",
-                            ["collected_at", "product_code", "product_name", "product_url", "chipset", "interface", "memory_type", "memory_size"], spec_rows)
-            pages = {str(i): mall_page(mall_item("TH201", 1500000), mall_item("EE128", 2440000), mall_item("EE715", 2450000), mall_item("ED901", 2460000))
-                     for i in range(1, 7)}
-            pages["10"] = mall_page(mall_item("TH201", 1760000))
-            pages["11"] = mall_page(mall_item("TH201", 2380000))
-            pages["12"] = mall_page(mall_item("TH201", 2180000))
-            results = fix_price_outliers(out, day, 7, ["gpu"], fetch_factory=lambda category: pages.__getitem__)
+                            ["collected_at", "product_code", "product_name", "product_url", "chipset", "interface", "memory_type", "memory_size"],
+                            [["2026-10-04", code, "x", "u", "RTX 5080", "", "", "16GB"] for code in codes])
+            pages = {str(i): mall_page(mall_item("TH201", 1500000), mall_item("EE128", 2440000), mall_item("EE715", 2450000)) for i in range(1, 6)}
+            pages["20"] = mall_page(mall_item("TH201", 2180000))
+            pages["21"] = mall_page(mall_item("TH201", 2380000))
+            pages["22"] = mall_page(mall_item("TH201", 1600000))
+            pages["23"] = mall_page(mall_item("EE715", 1700000))
+            asked = []
+
+            def factory(category):
+                def fetch(code):
+                    asked.append(code)
+                    return pages[code]
+                return fetch
+
+            results = fix_price_outliers(out, day, 7, ["gpu"], fetch_factory=factory)
             latest = {row["product_code"]: row[day] for row in read_rows(out / "latest" / "gpu.csv")}
-            self.assertEqual("2440000", latest["1"])
-            self.assertEqual("", latest["10"])         # 의심 쇼핑몰 단독 + 같은 스펙보다 크게 쌈 → 오늘 가격에서 뺌
-            self.assertEqual("2380000", latest["11"])  # 의심 쇼핑몰 단독이어도 이전 가격이 있고 정상 범위면 유지
-            self.assertEqual("", latest["12"])         # 의심 쇼핑몰 단독 신규 상품은 뺌
-            dropped = [row for row in results if row["product_code"] == "10"][0]
-            self.assertEqual("", dropped["fixed_price"])
+            self.assertEqual("2440000", latest["1"])      # 시세보다 크게 싼 가격 → 시세 범위의 가장 싼 쇼핑몰
+            self.assertEqual("2460000", latest["6"])      # 정상가는 그대로 (상품 페이지도 안 엶)
+            self.assertNotIn("6", asked)
+            self.assertEqual("", latest["20"])            # 의심 쇼핑몰 단독 신규 상품 → 빼기
+            self.assertEqual("2380000", latest["21"])     # 기존 상품·시세 범위 → 유지 (안 엶)
+            self.assertEqual("", latest["22"])            # 시세보다 크게 싸고 의심 쇼핑몰 단독 → 빼기
+            self.assertEqual("1700000", latest["23"])     # 일반 판매처 단독이면 시세보다 싸도 유지
+            self.assertEqual({"1", "2", "3", "4", "5", "20", "22"}, {row["product_code"] for row in results})
+
+    def test_thin_mall_product_near_market_is_kept(self):
+        # 판매처가 적은 상품: 11번가 정상가 576,000 + 비싼 판매처 1,061,000 → 시세 범위면 576,000 그대로
+        day = "2026-10-06"
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            rows = [[str(i), f"RTX 5060 {i}", str(600000 + i * 5000), "620000"] for i in range(1, 10)]
+            rows += [["50", "GALAX 5060", "576000", "1061000"]]
+            write_price_csv(out / "latest" / "gpu.csv", ["product_code", "product_name", day, "2026-10-05"], rows)
+            write_price_csv(out / "specs" / "gpu_specs.csv",
+                            ["collected_at", "product_code", "product_name", "product_url", "chipset", "interface", "memory_type", "memory_size"],
+                            [["d", row[0], "x", "u", "RTX 5060", "", "", "8GB"] for row in rows])
+
+            def factory(category):
+                def fetch(code):
+                    raise AssertionError("시세 범위 상품은 페이지를 열지 않는다")
+                return fetch
+
+            self.assertEqual([], fix_price_outliers(out, day, 10, ["gpu"], fetch_factory=factory))
+            self.assertEqual("576000", {r["product_code"]: r[day] for r in read_rows(out / "latest" / "gpu.csv")}["50"])
 
     def test_failed_page_keeps_price(self):
         day = "2026-10-04"

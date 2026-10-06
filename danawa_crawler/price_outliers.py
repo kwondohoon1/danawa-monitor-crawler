@@ -24,6 +24,7 @@ from .core import make_session, write_csv
 CATE_CODES = {"gpu": "112753", "ram": "112752", "ssd": "112760"}
 DROP_RATIO = 0.85        # 직전 가격보다 15% 넘게 떨어지면 쇼핑몰 목록 확인
 OUTLIER_RATIO = 0.85     # 싼 쇼핑몰 5곳 중간값보다 15% 넘게 싸면 '혼자 튀는 가격'으로 제외
+MARKET_CATEGORIES = ("gpu",)  # 같은 스펙 시세로 판단하는 카테고리
 SUSPECT_MIN = 5          # 한 번 수집에서 이만큼 '혼자 튀는 가격'으로 빠진 쇼핑몰은 사기 의심
 MAX_CHECKS = 600         # 카테고리당 한 번에 확인하는 상품 수 상한
 WORKERS = 6
@@ -75,6 +76,8 @@ def clean_lowest(prices: list[tuple[int, str]], baseline: int | None = None) -> 
 
 
 _DIGITS = re.compile(r"(\d{4,5})")
+_SKIP_NAME = re.compile(r"중고|해외구매|리퍼|벌크")   # 원래 싼 상품 — 시세 계산·확인에서 제외 (사이트도 비교에 안 씀)
+CONSENSUS_MALLS = 3      # 상품 안에서 이만큼의 쇼핑몰이 최저가 근처(10% 이내)면 시세보다 싸도 진짜 가격
 
 
 def _norm(value: str) -> str:
@@ -179,16 +182,34 @@ def fix_category(output_dir: Path, day: str, hour: int, category: str, fetch: Ca
         return []
     col = header.index(day)
     base = _baselines(output_dir, day, hour, category, header, rows)
+    keys = spec_keys(output_dir, category)
+
+    # 같은 스펙 상품들의 오늘 시세(중간값). 판매처가 적은 상품은 자기 쇼핑몰 목록만으로는 기준을 못 잡으므로
+    # (비싼 판매처 한두 곳이 기준이 돼 정상가를 빼던 문제) 시세를 기준으로 판단한다.
+    today = {row[0]: _int(row[col]) if col < len(row) else None for row in rows if not _SKIP_NAME.search(row[1])}
+    group_prices: dict[str, list[int]] = {}
+    for code, price in today.items():
+        if price and keys.get(code):
+            group_prices.setdefault(keys[code], []).append(price)
+    # 시세 기준은 그래픽카드만 (칩셋+VRAM 이 같으면 가격대가 좁음). RAM·SSD 는 같은 묶음 안에서도
+    # 저가형·고급형 차이가 커서 시세로 판단하면 정상가를 대량으로 잘못 뺀다 → 상품 안 쇼핑몰 비교만.
+    market = ({key: sorted(v)[len(v) // 2] for key, v in group_prices.items() if len(v) >= 5}
+              if category in MARKET_CATEGORIES else {})
 
     candidates = []
     for row in rows:
-        price = _int(row[col]) if col < len(row) else None
+        price = today.get(row[0])
         if not price:
             continue
         before = base.get(row[0])
-        if before is None or price < before * DROP_RATIO:
-            drop = 1.0 if before is None else price / before
-            candidates.append((drop, row[0], row[1], price, before))
+        median = market.get(keys.get(row[0], ""))
+        if median:
+            # 시세보다 15% 넘게 싸면 확인. 새 상품은 사기 의심 쇼핑몰 단독인지 보려고 확인(가격은 안 바꿈)
+            if price < median * OUTLIER_RATIO or before is None:
+                candidates.append((price / median, row[0], row[1], price, before, median))
+        elif before is None or price < before * DROP_RATIO:
+            # 스펙 묶음이 없으면 예전 방식: 직전 가격 대비 급락·새 상품을 상품 안 쇼핑몰끼리 비교
+            candidates.append((1.0 if before is None else price / before, row[0], row[1], price, before, None))
     candidates.sort()
     candidates = candidates[:MAX_CHECKS]
     if not candidates:
@@ -197,15 +218,27 @@ def fix_category(output_dir: Path, day: str, hour: int, category: str, fetch: Ca
     fetch = fetch or default_fetch(category)
 
     def check(item):
-        _, code, name, price, before = item
+        _, code, name, price, before, median = item
         try:
             mall_prices = parse_mall_prices(fetch(code))
         except Exception as error:  # 페이지를 못 읽으면 그대로 둔다
             print(f"  {category} {code}: mall list failed ({error})", flush=True)
             return None
-        clean, removed = clean_lowest(mall_prices, before)
+        if median:
+            floor = median * OUTLIER_RATIO
+            removed = [row for row in mall_prices if row[0] < floor]
+            ok = [row for row in mall_prices if row[0] >= floor]
+            near = [row for row in mall_prices if row[0] <= price * 1.1]
+            if price >= floor or len(near) >= CONSENSUS_MALLS:
+                clean = price                                  # 시세 범위, 또는 여러 쇼핑몰이 같은 값 → 그대로
+                removed = []
+            else:
+                clean = ok[0][0] if ok else 0                  # 시세 범위의 가장 싼 쇼핑몰, 없으면 0(사기 의심 쇼핑몰 단독일 때만 빼기)
+        else:
+            clean, removed = clean_lowest(mall_prices, before)
         kept_malls = {mall for value, mall in mall_prices if (value, mall) not in removed}
-        return {"code": code, "name": name, "price": price, "before": before, "clean": clean, "removed": removed, "kept": kept_malls}
+        return {"code": code, "name": name, "price": price, "before": before, "clean": clean, "removed": removed,
+                "kept": kept_malls, "median": median}
 
     started = time.time()
     with ThreadPoolExecutor(max_workers=WORKERS) as pool:
@@ -216,42 +249,38 @@ def fix_category(output_dir: Path, day: str, hour: int, category: str, fetch: Ca
                 "crawled_price": str(c["price"]), "fixed_price": fixed, "baseline": "" if c["before"] is None else str(c["before"]),
                 "removed": removed}
 
-    # 1차: 같은 상품 안에서 다른 쇼핑몰보다 혼자 튀는 가격을 빼고 다음 최저가로
+    def removed_text(c) -> str:
+        text = " ".join(f"{mall}:{value}" for value, mall in c["removed"])
+        return f"{text} (같은 스펙 시세 {c['median']})" if c["median"] else text
+
+    # 1차: 시세(또는 상품 안 다른 쇼핑몰)보다 크게 싼 가격을 빼고 다음 최저가로, 남는 쇼핑몰이 없으면 빼기
     fixes: dict[str, str] = {}
     results = []
     for c in checked:
         if c["clean"] and c["clean"] > c["price"]:
             fixes[c["code"]] = str(c["clean"])
-            results.append(log_row(c, str(c["clean"]), " ".join(f"{mall}:{value}" for value, mall in c["removed"])))
+            results.append(log_row(c, str(c["clean"]), removed_text(c)))
 
-    # 2차: 이번에 '혼자 튀는 가격'으로 여러 번 빠진 쇼핑몰(사기 의심)에서만 파는 상품은 비교할 다른 쇼핑몰이 없다.
-    # 이전 가격이 없는(새로 나타난) 상품이면 뺀다 — 사기 업체가 직접 올린 상품의 전형.
-    # 이전 가격이 있으면 같은 스펙 상품 중간값보다 15% 넘게 쌀 때만 뺀다.
-    counts = Counter(mall for c in checked for _, mall in c["removed"])
+    # 2차: 이번에 여러 번 빠진 쇼핑몰(사기 의심)에서만 파는 '새로 나타난' 상품은 뺀다
+    # — 사기 업체가 직접 올린 상품의 전형(예: ASUS RTX 5080 NOCTUA 2,180,000원, TH201 단독)
+    # 실제로 상품 최저가를 만들었다가 빠진 쇼핑몰만 센다 (목록에 섞인 다른 싼 판매처는 세지 않음)
+    counts = Counter(mall for c in checked if c["code"] in fixes for value, mall in c["removed"] if value == c["price"])
     suspects = {mall for mall, n in counts.items() if n >= SUSPECT_MIN}
     if suspects:
-        keys = spec_keys(output_dir, category)
-        today = {row[0]: _int(fixes.get(row[0], row[col] if col < len(row) else "")) for row in rows}
-        groups: dict[str, list[tuple[str, int]]] = {}
-        for code, price in today.items():
-            if price and keys.get(code):
-                groups.setdefault(keys[code], []).append((code, price))
         for c in checked:
-            key = keys.get(c["code"])
-            if c["code"] in fixes or not c["kept"] or not c["kept"] <= suspects:
+            if c["code"] in fixes:
                 continue
-            malls = " ".join(f"{mall}:{c['price']}" for mall in sorted(c["kept"]))
-            if c["before"] is None:
-                fixes[c["code"]] = ""
-                results.append(log_row(c, "", f"{malls} (의심 쇼핑몰 단독 신규 상품)"))
+            sellers = {mall for _, mall in c["removed"]} | c["kept"] if c["clean"] == 0 else c["kept"]
+            if not sellers or not sellers <= suspects:
+                continue                                       # 일반 판매처(G마켓·옥션 등)도 팔면 그대로 둔다
+            if c["clean"] == 0:                                # 시세보다 크게 싼데 의심 쇼핑몰에서만 판다
+                why = f"(의심 쇼핑몰 단독, 같은 스펙 시세 {c['median']})"
+            elif c["before"] is None:                          # 의심 쇼핑몰에서만 파는 새 상품
+                why = "(의심 쇼핑몰 단독 신규 상품)"
+            else:
                 continue
-            peers = sorted(price for code, price in groups.get(key, []) if code != c["code"]) if key else []
-            if len(peers) < 5:
-                continue
-            median = peers[len(peers) // 2]
-            if c["price"] < median * OUTLIER_RATIO:
-                fixes[c["code"]] = ""
-                results.append(log_row(c, "", f"{malls} (의심 쇼핑몰 단독, 같은 스펙 중간값 {median})"))
+            fixes[c["code"]] = ""
+            results.append(log_row(c, "", " ".join(f"{mall}:{c['price']}" for mall in sorted(sellers)) + f" {why}"))
 
     if fixes:
         _set_today(latest, day, fixes)
