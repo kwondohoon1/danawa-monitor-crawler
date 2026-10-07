@@ -1,9 +1,10 @@
-"""Open-market-only lowest price (with shipping fee) for every GPU/RAM/SSD product.
+"""Lowest price without cash-only malls (with shipping fee) for every GPU/RAM/SSD product.
 
 The list-page price is the lowest of *all* malls, including cash-only specialist shops
 (일반 전문몰, 카드/현금 동일 전문몰 such as 컴오아시스) that we do not compete with. Danawa's product
-page groups offers by mall type; its '오픈마켓' group (11번가, G마켓, 옥션, 네이버 스마트스토어 ...)
-is fetched per product here, and the cheapest believable offer is written with its shipping fee to
+page groups offers by mall type; its '오픈마켓' group (11번가, G마켓, 옥션, 네이버 스마트스토어 ...) and
+'백화점/홈쇼핑/종합몰' group (SSG, 롯데ON, 하이마트 ...) are fetched per product here, and the
+offer with the lowest price + shipping fee among believable offers is written to
 
     data/latest/<category>_open.csv
     data/hourly/<day>/<category>_open_<HH>.csv
@@ -28,7 +29,7 @@ from .price_outliers import CONSENSUS_MALLS, OUTLIER_RATIO, _SKIP_NAME, _int
 
 OPEN_FIELDS = ["product_code", "product_name", "price", "shipping", "mall", "offers", "removed"]
 OPEN_URL = "https://prod.danawa.com/info/ajax/getPartPriceCompareMallList.ajax.php"
-OFFERS = 10              # 상품당 받는 오픈마켓 판매 수 (가격순)
+OFFERS = 10              # 상품당 묶음별로 받는 판매 수 (가격순)
 WORKERS = 8
 
 _ITEM = re.compile(r'<div class="diff_item[^"]*"[^>]*>(.*?)(?=<div class="diff_item|\Z)', re.S)
@@ -47,7 +48,7 @@ def shipping_fee(text: str) -> int | None:
 
 
 def parse_offers(html: str) -> list[dict]:
-    """오픈마켓 판매 목록 -> [{price, mall, name, shipping}] 가격순."""
+    """오픈마켓·종합몰 판매 목록 -> [{price, mall, name, shipping}] 가격순."""
     offers = []
     for item in _ITEM.findall(html):
         mall, price, name = _MALL.search(item), _PRICE.search(item), _NAME.search(item)
@@ -65,15 +66,19 @@ def parse_offers(html: str) -> list[dict]:
 def default_fetch() -> Callable[[str], str]:
     session = make_session()
 
-    def fetch(code: str) -> str:
+    def part(code: str, mall_type: str, count_field: str) -> str:
         response = session.post(
             OPEN_URL,
-            data={"pcode": code, "sMallType": "OpenMarket", "nPage": 1, "sSortType": "minPrice", "nOpenMarketMoreCount": OFFERS},
+            data={"pcode": code, "sMallType": mall_type, "nPage": 1, "sSortType": "minPrice", count_field: OFFERS},
             headers={"Referer": f"https://prod.danawa.com/info/?pcode={code}", "X-Requested-With": "XMLHttpRequest"},
             timeout=15,
         )
         response.raise_for_status()
         return response.content.decode("utf-8", "replace")
+
+    def fetch(code: str) -> str:
+        # 오픈마켓 + 백화점/홈쇼핑/종합몰 (현금몰인 '카드/현금 동일 전문몰'·'일반 전문몰'은 받지 않음)
+        return part(code, "OpenMarket", "nOpenMarketMoreCount") + part(code, "Affiliate", "nAffiliateMoreCount")
 
     return fetch
 
@@ -93,11 +98,12 @@ def _products(output_dir: Path, day: str, category: str) -> list[tuple[str, str,
 
 
 def pick(offers: list[dict], floor: float) -> tuple[dict | None, list[dict]]:
-    """floor 이상이거나 여러 판매처가 같은 값(10% 이내)인 가장 싼 판매 -> (offer, 그보다 싸서 뺀 판매들)."""
+    """믿을 만한 판매(floor 이상이거나 여러 판매처가 같은 값, 10% 이내) 중 상품가+배송비가 가장 싼 판매
+    -> (offer, 믿을 수 없어 뺀 판매들)."""
     for i, offer in enumerate(offers):
         near = {o["name"] for o in offers[i:] if o["price"] <= offer["price"] * 1.1}
         if offer["price"] >= floor or len(near) >= CONSENSUS_MALLS:
-            return offer, offers[:i]
+            return min(offers[i:], key=lambda o: (o["price"] + (o["shipping"] or 0), o["price"])), offers[:i]
     return None, offers
 
 

@@ -88,7 +88,7 @@ def collect(day: str, hour: int, categories: list[str], use_git: bool) -> None:
     except Exception as error:
         print(f"price outlier check failed: {error}", flush=True)
     try:
-        # 오픈마켓(11번가·G마켓·옥션·스마트스토어)만의 최저가와 배송비. 실패해도 수집은 계속
+        # 현금몰을 뺀(오픈마켓+백화점·종합몰) 최저가와 배송비. 실패해도 수집은 계속
         collect_open_market(output_dir, day, hour, categories)
     except Exception as error:
         print(f"open-market prices failed: {error}", flush=True)

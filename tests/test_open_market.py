@@ -46,6 +46,11 @@ class PickTests(unittest.TestCase):
         offers = [offer(3370300, "G마켓"), offer(3370300, "옥션"), offer(3370310, "11번가"), offer(4069420, "A")]
         self.assertEqual((offers[0], []), pick(offers, 4289990 * 0.85))
 
+    def test_picks_cheapest_with_shipping(self):
+        offers = [{"price": 1479000, "mall": "A", "name": "A", "shipping": 3000},
+                  {"price": 1481000, "mall": "B", "name": "B", "shipping": 0}]
+        self.assertEqual((offers[1], []), pick(offers, 1000000))
+
     def test_nothing_believable(self):
         offers = [offer(100, "A")]
         self.assertEqual((None, offers), pick(offers, 1000))
