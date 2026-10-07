@@ -28,6 +28,7 @@ from danawa_crawler.hourly_prices import (  # noqa: E402
     slot_done,
     update_readme,
 )
+from danawa_crawler.open_market import collect_open_market  # noqa: E402
 from danawa_crawler.price_outliers import fix_price_outliers  # noqa: E402
 
 
@@ -57,6 +58,7 @@ def commit_and_push(categories: list[str], message: str) -> None:
     for category in categories:
         paths += [
             f"data/latest/{category}.csv",
+            f"data/latest/{category}_open.csv",
             f"data/history/{category}_price_history.csv",
             f"data/new_products/{category}.csv",
             f"data/state/known_products/{category}.csv",
@@ -85,6 +87,11 @@ def collect(day: str, hour: int, categories: list[str], use_git: bool) -> None:
         fix_price_outliers(output_dir, day, hour, categories)
     except Exception as error:
         print(f"price outlier check failed: {error}", flush=True)
+    try:
+        # 오픈마켓(11번가·G마켓·옥션·스마트스토어)만의 최저가와 배송비. 실패해도 수집은 계속
+        collect_open_market(output_dir, day, hour, categories)
+    except Exception as error:
+        print(f"open-market prices failed: {error}", flush=True)
     record_hour(output_dir, day, hour, collected_at, categories)
     removed = prune_old_days(output_dir, day)
     if removed:
