@@ -6,35 +6,35 @@ CPU, 그래픽카드, 메인보드, RAM, SSD, HDD, 쿨러, 케이스, 파워는 
 각 카테고리는 서로 다른 GitHub Actions에서 따로 수집합니다.
 
 <!-- hourly-prices:start -->
-## 그래픽카드 · RAM · SSD 시간대별 가격 (오늘: 2026-10-13)
+## 그래픽카드 · RAM · SSD 시간대별 가격 (오늘: 2026-10-14)
 
 07:00~18:00 KST 매시 정각에 다나와 최저가를 수집합니다. 링크를 누르면 그 시간에 수집한 가격 CSV가 열립니다.
 
-[그래픽카드 오늘 시간대별 모아보기](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/gpu.csv) · [RAM 오늘 시간대별 모아보기](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ram.csv) · [SSD 오늘 시간대별 모아보기](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ssd.csv)
+[그래픽카드 오늘 시간대별 모아보기](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-14/gpu.csv) · [RAM 오늘 시간대별 모아보기](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-14/ram.csv) · [SSD 오늘 시간대별 모아보기](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-14/ssd.csv)
 
 | 시간 | 수집 시각 | 그래픽카드 | RAM | SSD |
 |---|---|---|---|---|
-| 07:00 | 07:00 | [856개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/gpu_07.csv) | [974개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ram_07.csv) | [1,783개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ssd_07.csv) |
-| 08:00 | 08:00 | [856개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/gpu_08.csv) | [974개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ram_08.csv) | [1,783개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ssd_08.csv) |
-| 09:00 | 09:00 | [855개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/gpu_09.csv) | [971개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ram_09.csv) | [1,786개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ssd_09.csv) |
-| 10:00 | 10:00 | [854개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/gpu_10.csv) | [971개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ram_10.csv) | [1,785개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ssd_10.csv) |
-| 11:00 | 11:00 | [853개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/gpu_11.csv) | [972개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ram_11.csv) | [1,787개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ssd_11.csv) |
-| 12:00 | 12:00 | [853개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/gpu_12.csv) | [972개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ram_12.csv) | [1,787개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ssd_12.csv) |
-| 13:00 | 13:00 | [853개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/gpu_13.csv) | [970개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ram_13.csv) | [1,787개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ssd_13.csv) |
-| 14:00 | 14:00 | [850개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/gpu_14.csv) | [976개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ram_14.csv) | [1,789개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ssd_14.csv) |
-| 15:00 | 15:00 | [852개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/gpu_15.csv) | [981개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ram_15.csv) | [1,789개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ssd_15.csv) |
-| 16:00 | 16:00 | [852개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/gpu_16.csv) | [983개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ram_16.csv) | [1,793개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ssd_16.csv) |
-| 17:00 | 17:00 | [852개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/gpu_17.csv) | [983개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ram_17.csv) | [1,793개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ssd_17.csv) |
-| 18:00 | 18:00 | [852개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/gpu_18.csv) | [993개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ram_18.csv) | [1,792개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ssd_18.csv) |
+| 07:00 | 07:00 | [849개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-14/gpu_07.csv) | [993개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-14/ram_07.csv) | [1,792개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-14/ssd_07.csv) |
+| 08:00 | 대기 | — | — | — |
+| 09:00 | 대기 | — | — | — |
+| 10:00 | 대기 | — | — | — |
+| 11:00 | 대기 | — | — | — |
+| 12:00 | 대기 | — | — | — |
+| 13:00 | 대기 | — | — | — |
+| 14:00 | 대기 | — | — | — |
+| 15:00 | 대기 | — | — | — |
+| 16:00 | 대기 | — | — | — |
+| 17:00 | 대기 | — | — | — |
+| 18:00 | 대기 | — | — | — |
 
 지난 7일 시간대별 기록:
 
+- 2026-10-13: [그래픽카드](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/gpu.csv) · [RAM](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ram.csv) · [SSD](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-13/ssd.csv)
 - 2026-10-12: [그래픽카드](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-12/gpu.csv) · [RAM](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-12/ram.csv) · [SSD](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-12/ssd.csv)
 - 2026-10-11: [그래픽카드](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-11/gpu.csv) · [RAM](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-11/ram.csv) · [SSD](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-11/ssd.csv)
 - 2026-10-10: [그래픽카드](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-10/gpu.csv) · [RAM](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-10/ram.csv) · [SSD](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-10/ssd.csv)
 - 2026-10-09: [그래픽카드](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-09/gpu.csv) · [RAM](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-09/ram.csv) · [SSD](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-09/ssd.csv)
 - 2026-10-08: [그래픽카드](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-08/gpu.csv) · [RAM](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-08/ram.csv) · [SSD](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-08/ssd.csv)
-- 2026-10-07: [그래픽카드](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-07/gpu.csv) · [RAM](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-07/ram.csv) · [SSD](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-07/ssd.csv)
 <!-- hourly-prices:end -->
 
 ## 가격정보 바로가기
