@@ -86,12 +86,13 @@ def _norm(value: str) -> str:
 
 def spec_keys(output_dir: Path, category: str) -> dict[str, str]:
     """product_code -> 같은 스펙 묶음 키 (그래픽카드: 칩셋+VRAM, SSD: 폼팩터+인터페이스+용량, RAM: 세대+클럭+용량)."""
-    path = output_dir / "specs" / f"{category}_specs.csv"
-    if not path.exists():
-        return {}
     keys = {}
-    with path.open("r", encoding="utf-8-sig", newline="") as file:
-        for row in csv.DictReader(file):
+    for path in (output_dir / "specs" / f"{category}_specs.csv", output_dir / "specs" / f"{category}_specs_new.csv"):
+        if not path.exists():
+            continue
+        with path.open("r", encoding="utf-8-sig", newline="") as file:
+            rows = list(csv.DictReader(file))
+        for row in rows:
             if category == "gpu":
                 parts = [row.get("chipset"), row.get("memory_size")]
             elif category == "ssd":

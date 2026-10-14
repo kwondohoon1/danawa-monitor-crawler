@@ -28,6 +28,7 @@ from danawa_crawler.hourly_prices import (  # noqa: E402
     slot_done,
     update_readme,
 )
+from danawa_crawler.component_specs import crawl_missing_specs  # noqa: E402
 from danawa_crawler.open_market import collect_open_market  # noqa: E402
 from danawa_crawler.price_outliers import fix_price_outliers  # noqa: E402
 
@@ -59,6 +60,7 @@ def commit_and_push(categories: list[str], message: str) -> None:
         paths += [
             f"data/latest/{category}.csv",
             f"data/latest/{category}_open.csv",
+            f"data/specs/{category}_specs_new.csv",
             f"data/history/{category}_price_history.csv",
             f"data/new_products/{category}.csv",
             f"data/state/known_products/{category}.csv",
@@ -82,6 +84,14 @@ def collect(day: str, hour: int, categories: list[str], use_git: bool) -> None:
         print(f"{day} {hour:02d}:00 crawl failed; will retry at the next hour", flush=True)
         return
     output_dir = ROOT / "data"
+    for category in categories:
+        try:
+            # 오늘 다나와에 새로 등록된 상품의 스펙 (전체 스펙 수집은 하루 한 번이라 그 전까지 비어 있음)
+            fetched = crawl_missing_specs(output_dir, category)
+            if fetched:
+                print(f"{category}: fetched specs for {fetched} new products", flush=True)
+        except Exception as error:
+            print(f"{category} new product specs failed: {error}", flush=True)
     try:
         # 판매처 한 곳의 비정상 최저가(사기 의심)를 쇼핑몰별 가격으로 바로잡는다. 실패해도 수집은 계속
         fix_price_outliers(output_dir, day, hour, categories)

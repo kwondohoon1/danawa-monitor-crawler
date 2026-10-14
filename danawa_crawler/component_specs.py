@@ -293,6 +293,38 @@ def crawl_component_specs(
     return len(ordered), errors
 
 
+def _read_rows(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8-sig", newline="") as file:
+        return list(csv.DictReader(file))
+
+
+def crawl_missing_specs(output_dir: Path, category: str, workers: int = 8, timeout: int = 15, retries: int = 1) -> int:
+    """Specs for products in today's price list that the daily spec crawl has not seen yet.
+
+    The full spec crawl runs once a day, so a product registered on Danawa during the day has a price
+    but no specs until tomorrow. Those products are fetched every hour into data/specs/<cat>_specs_new.csv
+    (a separate file, so the hourly job never edits the file the daily job rewrites).
+    """
+    component = COMPONENTS[category]
+    known = {row["product_code"] for row in _read_rows(output_dir / "specs" / f"{component.slug}_specs.csv")}
+    extra_path = output_dir / "specs" / f"{component.slug}_specs_new.csv"
+    extra = {row["product_code"]: row for row in _read_rows(extra_path) if row["product_code"] not in known}
+    items = [item for item in load_component_inputs(component, output_dir / "latest" / f"{component.slug}.csv")
+             if item.product_code not in known]
+    todo = [item for item in items if extra.get(item.product_code, {}).get("fetch_status") != "ok"]
+    collected_at = datetime.now().astimezone().isoformat(timespec="seconds")
+    if todo:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            for row in executor.map(lambda item: fetch_one(component, item, collected_at, timeout, retries), todo):
+                extra[row["product_code"]] = row
+    rows = [extra[item.product_code] for item in items if item.product_code in extra]
+    if rows or extra_path.exists():
+        write_csv(extra_path, component.spec_fields, rows)
+    return len(todo)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Collect PC component (GPU/RAM/SSD) specs from Danawa product pages.")
     parser.add_argument("--category", required=True, choices=sorted(COMPONENTS), help="Component category.")
