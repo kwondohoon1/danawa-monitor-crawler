@@ -35,6 +35,8 @@ SPEC_FIELDS = [
     "registration_month",
     "fetch_status",
     "error",
+    # Appended last so positional readers of the older columns keep working.
+    "image_url",
 ]
 
 _thread_local = threading.local()
@@ -272,7 +274,23 @@ def parse_monitor_specs(html: str) -> dict[str, str]:
         "special_features": join_tokens(special),
         "full_spec": join_tokens(tokens),
         "registration_month": parse_registration_month(html),
+        "image_url": parse_image_url(html),
     }
+
+
+def parse_image_url(html: str) -> str:
+    """Representative product image (og:image) at full size.
+
+    New products live on img.danuri.io under a hashed file name, so the URL
+    cannot be derived from the product code; browsers cannot read the product
+    page cross-origin either, which is why it is stored here.
+    """
+    meta = BeautifulSoup(html, "html.parser").select_one('meta[property="og:image"]')
+    url = normalize_space(meta.get("content", "")) if meta else ""
+    if not url.startswith("http"):
+        return ""
+    # ?shrink=160:160 is a thumbnail; without the query the original (1000px) is served.
+    return url.split("?", 1)[0]
 
 
 def parse_registration_month(html: str) -> str:

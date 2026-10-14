@@ -129,6 +129,24 @@ class ParserTests(unittest.TestCase):
         self.assertIn("4K UHD(3840x2160)", specs["full_spec"])
         self.assertEqual(specs["registration_month"], "2026/02")
 
+    def test_parse_monitor_image_url_strips_thumbnail_query(self):
+        html = """
+        <head><meta property="og:image" content="https://img.danuri.io/catalog-image/304/590/123/9f3cc145715e4526874f44a8164668da.jpeg?shrink=160:160&amp;_v=20261014080326"/></head>
+        <div class="spec_list"><div class="items"><span><u>68.5cm(27인치)</u></span></div></div>
+        """
+
+        specs = parse_monitor_specs(html)
+
+        self.assertEqual(
+            specs["image_url"],
+            "https://img.danuri.io/catalog-image/304/590/123/9f3cc145715e4526874f44a8164668da.jpeg",
+        )
+
+    def test_parse_monitor_image_url_missing(self):
+        specs = parse_monitor_specs('<div class="spec_list"><div class="items"><span>27인치</span></div></div>')
+
+        self.assertEqual(specs["image_url"], "")
+
     def test_parse_monitor_resolution_without_resolution_label(self):
         html = """
         <div class="spec_list">
