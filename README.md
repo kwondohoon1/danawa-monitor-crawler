@@ -21,7 +21,7 @@ CPU, 그래픽카드, 메인보드, RAM, SSD, HDD, 쿨러, 케이스, 파워는 
 | 11:00 | 11:00 | [861개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-21/gpu_11.csv) | [1,009개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-21/ram_11.csv) | [1,806개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-21/ssd_11.csv) |
 | 12:00 | 12:00 | [861개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-21/gpu_12.csv) | [1,008개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-21/ram_12.csv) | [1,807개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-21/ssd_12.csv) |
 | 13:00 | 13:00 | [861개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-21/gpu_13.csv) | [1,008개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-21/ram_13.csv) | [1,807개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-21/ssd_13.csv) |
-| 14:00 | 대기 | — | — | — |
+| 14:00 | 14:00 | [859개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-21/gpu_14.csv) | [1,006개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-21/ram_14.csv) | [1,811개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-10-21/ssd_14.csv) |
 | 15:00 | 대기 | — | — | — |
 | 16:00 | 대기 | — | — | — |
 | 17:00 | 대기 | — | — | — |
