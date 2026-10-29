@@ -23,9 +23,12 @@ from danawa_crawler.monitor_specs import (
 
 
 BASE_FIELDS = ["collected_at", "product_code", "product_name", "product_url"]
-# 이 비율보다 많이 실패하면(다나와 접속 장애 등) 기존 스펙 파일을 덮어쓰지 않는다
-# — 2026-10-28 전 상품 ConnectTimeout 으로 빈 스펙이 올라가 동일스펙 사이트가 전부 '비교 불가'가 됐음
-MAX_ERROR_SHARE = 0.1
+# 2026-10-28 전 상품이 ConnectTimeout(연결 자체가 막힘)으로 실패했는데 빈 스펙을 그대로 저장해
+# 동일스펙 사이트가 전부 '비교 불가'가 됐음. 그래서
+#  1) 수집 전 접속을 확인하고 안 되면 기다렸다 다시 (PROBE_WAITS)
+#  2) 실패한 상품은 이전 스펙 행을 그대로 두고(부분 갱신), 성공한 것만 새 값으로 바꾼다
+PROBE_WAITS = (0, 60, 180, 300)     # 접속 확인 재시도 전 대기(초)
+MAX_ERROR_SHARE = 0.1               # 이보다 많이 실패하면 경고
 TAIL_FIELDS = ["full_spec", "registration_month", "fetch_status", "error"]
 
 _thread_local = threading.local()
@@ -277,6 +280,12 @@ def crawl_component_specs(
     items = load_component_inputs(component, input_path, limit)
     collected_at = datetime.now().astimezone().isoformat(timespec="seconds")
     results: list[dict[str, str] | None] = [None] * len(items)
+    previous = {row["product_code"]: row for row in _read_rows(output_path) if row.get("fetch_status") == "ok"}
+
+    # 접속 확인: 첫 상품이 연결 오류로 실패하면 잠시 기다렸다가 다시 (다나와가 연결을 막는 동안 헛돌지 않게)
+    if items and not probe(component, items[0], timeout):
+        print(f"{component.slug} specs: Danawa is not reachable - keeping the previous file", flush=True)
+        return len(items), len(items)
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = {
@@ -292,11 +301,33 @@ def crawl_component_specs(
 
     ordered = [row for row in results if row is not None]
     errors = sum(1 for row in ordered if row["fetch_status"] == "error")
-    if ordered and errors > len(ordered) * MAX_ERROR_SHARE and output_path.exists():
-        print(f"{component.slug} specs: {errors}/{len(ordered)} failed - keeping the previous file", flush=True)
-        return len(ordered), errors
+    # 실패한 상품은 이전에 받아 둔 스펙을 그대로 쓴다
+    kept = 0
+    for i, row in enumerate(ordered):
+        if row["fetch_status"] == "error" and row["product_code"] in previous:
+            ordered[i] = {**previous[row["product_code"]], "product_name": row["product_name"]}
+            kept += 1
+    if errors:
+        warn = f" (!! more than {int(MAX_ERROR_SHARE * 100)}% failed)" if errors > len(ordered) * MAX_ERROR_SHARE else ""
+        print(f"{component.slug} specs: {errors}/{len(ordered)} failed, {kept} kept from the previous file{warn}", flush=True)
     write_csv(output_path, component.spec_fields, ordered)
     return len(ordered), errors
+
+
+def probe(component: ComponentSpec, item: ComponentInput, timeout: int, waits=PROBE_WAITS) -> bool:
+    """Danawa 가 연결되는지 첫 상품으로 확인. 연결 오류면 waits 만큼 기다렸다가 다시 본다."""
+    last = None
+    for wait in waits:
+        if wait:
+            print(f"{component.slug} specs: connection failed, waiting {wait}s", flush=True)
+            time.sleep(wait)
+        try:
+            get_session().get(item.product_url, timeout=timeout).raise_for_status()
+            return True
+        except requests.RequestException as exc:
+            last = exc
+    print(f"{component.slug} specs: probe failed - {type(last).__name__}: {last}", flush=True)
+    return False
 
 
 def _read_rows(path: Path) -> list[dict[str, str]]:

@@ -2,8 +2,8 @@ name: Update component specs CSV
 
 on:
   schedule:
-    # 22:30 UTC = 07:30 KST, after the GPU/RAM/SSD price crawl
-    - cron: "30 22 * * *"
+    # 11:00 UTC = 20:00 KST — 매시 가격 수집(07~18시)과 겹치지 않는 시간에 (동시 접속이 겹치면 다나와가 연결을 막음)
+    - cron: "0 11 * * *"
   workflow_dispatch:
 
 permissions:
@@ -40,7 +40,7 @@ jobs:
         run: |
           # 한 카테고리가 많이 실패해도(기존 파일 유지) 나머지는 계속 수집한다
           for category in gpu ram ssd; do
-            python scripts/crawl_component_specs.py --category "$category" --workers 32 --timeout 20 --retries 3 || echo "$category specs: crawl had errors"
+            python scripts/crawl_component_specs.py --category "$category" --workers 12 --timeout 20 --retries 3 || echo "$category specs: crawl had errors"
           done
 
       - name: Commit CSV changes
