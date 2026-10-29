@@ -47,3 +47,21 @@ class MissingSpecsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ErrorShareTests(unittest.TestCase):
+    def test_keeps_previous_file_when_most_fetches_fail(self):
+        from danawa_crawler.component_specs import crawl_component_specs
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            write(out / "latest" / "gpu.csv", ["product_code", "product_name"], [[str(i), f"카드 {i}"] for i in range(1, 11)])
+            fields = COMPONENTS["gpu"].spec_fields
+            write(out / "specs" / "gpu_specs.csv", fields, [["x", "1", "카드 1"] + [""] * (len(fields) - 3)])
+
+            def fake(component, item, collected_at, timeout, retries):
+                return component_specs.empty_row(component, item, collected_at, "error", "ConnectTimeout")
+
+            with mock.patch.object(component_specs, "fetch_one", fake):
+                total, errors = crawl_component_specs(COMPONENTS["gpu"], out / "latest" / "gpu.csv", out / "specs" / "gpu_specs.csv", 2, 1, 0, None)
+            self.assertEqual((10, 10), (total, errors))
+            self.assertEqual(["1"], [r["product_code"] for r in read_rows(out / "specs" / "gpu_specs.csv")])   # 덮어쓰지 않음

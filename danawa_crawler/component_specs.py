@@ -23,6 +23,9 @@ from danawa_crawler.monitor_specs import (
 
 
 BASE_FIELDS = ["collected_at", "product_code", "product_name", "product_url"]
+# 이 비율보다 많이 실패하면(다나와 접속 장애 등) 기존 스펙 파일을 덮어쓰지 않는다
+# — 2026-10-28 전 상품 ConnectTimeout 으로 빈 스펙이 올라가 동일스펙 사이트가 전부 '비교 불가'가 됐음
+MAX_ERROR_SHARE = 0.1
 TAIL_FIELDS = ["full_spec", "registration_month", "fetch_status", "error"]
 
 _thread_local = threading.local()
@@ -289,6 +292,9 @@ def crawl_component_specs(
 
     ordered = [row for row in results if row is not None]
     errors = sum(1 for row in ordered if row["fetch_status"] == "error")
+    if ordered and errors > len(ordered) * MAX_ERROR_SHARE and output_path.exists():
+        print(f"{component.slug} specs: {errors}/{len(ordered)} failed - keeping the previous file", flush=True)
+        return len(ordered), errors
     write_csv(output_path, component.spec_fields, ordered)
     return len(ordered), errors
 
