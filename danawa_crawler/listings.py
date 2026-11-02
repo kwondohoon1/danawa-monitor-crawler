@@ -12,6 +12,8 @@ G마켓·옥션 상품 페이지는 봇 차단(403)이라 판매자 정보를 �
     싸면 사기로 보고 뺀다. 여러 개가 같이 싸도(계정 여러 개) 마찬가지.
   - 오래된 G마켓·옥션 상품은 혼자 싸도 빼지 않는다 (trusted).
   - data/blocked_listings.csv 에 적은 상품번호·쇼핑몰 전체(예: 판매를 안 하는데 가격만 남은 스마트스토어)·다나와 상품코드는 무조건 뺀다.
+  - 11번가는 상품 페이지를 읽을 수 있어 판매자(스토어 이름·번호)로도 뺀다 (예: 이비즈 ebiz). 가장 싼 11번가 판매만 확인하고
+    결과는 data/state/eleven_stores.csv 에 남겨 다시 읽지 않는다.
 """
 
 from __future__ import annotations
@@ -21,8 +23,9 @@ import re
 import threading
 from datetime import date
 from pathlib import Path
+from typing import Callable
 
-from .core import write_csv
+from .core import make_session, write_csv
 
 
 ESM = {"EE128": "G마켓", "EE715": "옥션"}
@@ -33,7 +36,18 @@ OLD_DAY = "2026-09-01"       # 오래된 상품으로 볼 때 적는 처음 본 
 NEW_DAYS = 14                # 처음 본 지 이만큼 안 되면 '새 상품'
 NEW_RATIO = 0.9              # 새 G마켓·옥션 상품이 믿을 만한 가격보다 10% 넘게 싸면 사기로 본다
 STATE_FIELDS = ["mall", "link_pcode", "first_seen"]
-BLOCK_FIELDS = ["product_code", "mall", "link_pcode", "note"]
+BLOCK_FIELDS = ["product_code", "mall", "link_pcode", "store", "note"]
+ELEVEN = {"TH201", "TY618D"}                 # 다나와의 11번가 쇼핑몰 코드
+STORE_FIELDS = ["link_pcode", "store_no", "store_name"]
+_STORE = re.compile(r'storeNo:\s*(\d+),\s*storeName:\s*"([^"]*)"')
+
+
+def fetch_store(link_pcode: str) -> tuple[str, str]:
+    """11번가 상품 페이지에서 (스토어 번호, 스토어 이름). 못 읽으면 ('', '')."""
+    response = make_session().get(f"https://www.11st.co.kr/products/{link_pcode}", timeout=15)
+    response.raise_for_status()
+    match = _STORE.search(response.text)
+    return (match.group(1), match.group(2)) if match else ("", "")
 
 _DIGITS = re.compile(r"\d+")
 
@@ -53,24 +67,35 @@ def _days(later: str, earlier: str) -> int:
 class Listings:
     """처음 본 날 기록(data/state/listings_seen.csv) + 수동 제외 목록(data/blocked_listings.csv)."""
 
-    def __init__(self, output_dir: Path):
+    def __init__(self, output_dir: Path, fetch_store: Callable[[str], tuple[str, str]] = fetch_store):
         self.path = output_dir / "state" / "listings_seen.csv"
+        self.store_path = output_dir / "state" / "eleven_stores.csv"
         self.seen: dict[tuple[str, str], str] = {}
+        self.stores: dict[str, tuple[str, str]] = {}          # 11번가 상품번호 -> (스토어 번호, 스토어 이름)
         self.block_listings: set[tuple[str, str]] = set()
         self.block_products: set[str] = set()
         self.block_malls: set[str] = set()
+        self.block_stores: set[str] = set()                     # 11번가 스토어 이름 또는 번호
+        self._fetch_store = fetch_store
         self._lock = threading.Lock()
         self._dirty = False
         if self.path.exists():
             with self.path.open("r", encoding="utf-8-sig", newline="") as file:
                 for row in csv.DictReader(file):
                     self.seen[(row["mall"], row["link_pcode"])] = row["first_seen"]
+        if self.store_path.exists():
+            with self.store_path.open("r", encoding="utf-8-sig", newline="") as file:
+                for row in csv.DictReader(file):
+                    self.stores[row["link_pcode"]] = (row["store_no"], row["store_name"])
         block = output_dir / "blocked_listings.csv"
         if block.exists():
             with block.open("r", encoding="utf-8-sig", newline="") as file:
                 for row in csv.DictReader(file):
                     code, mall, link = (row.get("product_code") or "").strip(), (row.get("mall") or "").strip(), (row.get("link_pcode") or "").strip()
-                    if link:
+                    store = (row.get("store") or "").strip()
+                    if store:
+                        self.block_stores.add(store)        # 11번가 스토어
+                    elif link:
                         self.block_listings.add((mall, link))
                     elif code:
                         self.block_products.add(code)
@@ -95,11 +120,35 @@ class Listings:
     def is_blocked(self, mall: str, link_pcode: str) -> bool:
         return mall in self.block_malls or (mall, link_pcode) in self.block_listings or ("", link_pcode) in self.block_listings
 
+    def store_of(self, link_pcode: str) -> tuple[str, str]:
+        """11번가 상품의 (스토어 번호, 이름). 처음 보는 상품만 페이지를 읽고 기록한다."""
+        with self._lock:
+            if link_pcode in self.stores:
+                return self.stores[link_pcode]
+        try:
+            store = self._fetch_store(link_pcode)
+        except Exception as error:                              # 못 읽으면 이번엔 모름(기록 안 함)
+            print(f"  11st store lookup failed {link_pcode}: {error}", flush=True)
+            return ("", "")
+        with self._lock:
+            self.stores[link_pcode] = store
+            self._dirty = True
+        return store
+
+    def store_blocked(self, mall: str, link_pcode: str) -> str:
+        """막아 둔 11번가 스토어의 판매면 스토어 이름, 아니면 ''."""
+        if mall not in ELEVEN or not link_pcode or not self.block_stores:
+            return ""
+        number, name = self.store_of(link_pcode)
+        return name or number if (name in self.block_stores or number in self.block_stores) else ""
+
     def save(self) -> None:
         if not self._dirty:
             return
         rows = [{"mall": mall, "link_pcode": code, "first_seen": day} for (mall, code), day in sorted(self.seen.items())]
         write_csv(self.path, STATE_FIELDS, rows)
+        write_csv(self.store_path, STORE_FIELDS,
+                  [{"link_pcode": code, "store_no": no, "store_name": name} for code, (no, name) in sorted(self.stores.items())])
         self._dirty = False
 
 
@@ -123,6 +172,12 @@ def split(offers: list[dict], day: str, listings: Listings | None, market: int |
             if mall in ESM and code:
                 offer["trusted"] = True
             kept.append(offer)
+    # 가장 싼 11번가 판매가 막아 둔 스토어 것이면 뺀다 (스토어 확인은 페이지를 읽어야 해서 가장 싼 것만 본다)
+    while kept and kept[0].get("mall") in ELEVEN:
+        store = listings.store_blocked(kept[0]["mall"], kept[0].get("code", ""))
+        if not store:
+            break
+        removed.append((kept.pop(0), f"막아 둔 11번가 스토어 {store}"))
     if fresh:
         # 믿을 만한 가격: 새 상품이 아닌 판매 중 최저가와 같은 스펙 시세 중 작은 값
         refs = [o["price"] for o in kept] + ([market] if market else [])

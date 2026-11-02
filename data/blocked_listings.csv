@@ -1,2 +1,4 @@
-product_code,mall,link_pcode,note
-,TX222A,,GALAX 온라인스토어(스마트스토어) 판매 안 하는데 가격만 남음 2026-11-02
+product_code,mall,link_pcode,store,note
+,TX222A,,,GALAX 온라인스토어(스마트스토어) 판매 안 하는데 가격만 남음 2026-11-02
+,,,ebiz,11번가 이비즈(스토어 1194021) 사기 의심 2026-11-02
+,,,ebiz_info,11번가 이비즈인포(스토어 176429) 같은 업체 2026-11-02

@@ -56,6 +56,44 @@ class PickTests(unittest.TestCase):
         self.assertEqual((None, offers), pick(offers, 1000))
 
 
+class ElevenStoreTests(unittest.TestCase):
+    def test_blocked_11st_store_is_removed_and_cached(self):
+        from danawa_crawler.listings import Listings, split
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "blocked_listings.csv").write_text("product_code,mall,link_pcode,store,note\n,,,ebiz,사기\n", encoding="utf-8-sig")
+            asked = []
+
+            def fake(code):
+                asked.append(code)
+                return {"9490264322": ("1194021", "ebiz"), "7": ("1", "정상스토어")}[code]
+
+            listings = Listings(out, fetch_store=fake)
+            offers = [{"price": 1868370, "mall": "TH201", "code": "9490264322"}, {"price": 2000000, "mall": "TH201", "code": "7"},
+                      {"price": 2148900, "mall": "TX222A", "code": "5"}]
+            kept, removed = split(offers, "2026-11-02", listings)
+            self.assertEqual([2000000, 2148900], [o["price"] for o in kept])
+            self.assertEqual([(offers[0], "막아 둔 11번가 스토어 ebiz")], removed)
+            self.assertEqual(["9490264322", "7"], asked)                     # 가장 싼 11번가 판매부터, 막힌 게 아니면 거기서 끝
+            listings.save()
+            again = Listings(out, fetch_store=lambda code: (_ for _ in ()).throw(AssertionError("cached")))
+            self.assertEqual(("1194021", "ebiz"), again.store_of("9490264322"))
+            self.assertEqual("ebiz", again.store_blocked("TH201", "9490264322"))
+
+    def test_store_lookup_failure_keeps_offer(self):
+        from danawa_crawler.listings import Listings, split
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "blocked_listings.csv").write_text("product_code,mall,link_pcode,store,note\n,,,ebiz,사기\n", encoding="utf-8-sig")
+
+            def fail(code):
+                raise OSError("timeout")
+
+            offers = [{"price": 1868370, "mall": "TH201", "code": "9490264322"}]
+            kept, removed = split(offers, "2026-11-02", Listings(out, fetch_store=fail))
+            self.assertEqual((offers, []), (kept, removed))
+
+
 class CollectTests(unittest.TestCase):
     def test_writes_latest_and_hourly_open_prices(self):
         day = "2026-10-07"
@@ -127,7 +165,7 @@ class CollectTests(unittest.TestCase):
             out = Path(tmp)
             (out / "latest").mkdir()
             (out / "latest" / "gpu.csv").write_text(f"product_code,product_name,{day}\n1,A,3000000\n2,B,3000000\n", encoding="utf-8-sig")
-            (out / "blocked_listings.csv").write_text("product_code,mall,link_pcode,note\n,EE128,4774903003,사기\n2,,,상품 전체 제외\n,TX222A,,판매 안 함\n", encoding="utf-8-sig")
+            (out / "blocked_listings.csv").write_text("product_code,mall,link_pcode,store,note\n,EE128,4774903003,,사기\n2,,,,상품 전체 제외\n,TX222A,,,판매 안 함\n", encoding="utf-8-sig")
             pages = {"1": offer_html("EE128", 2311990, code="4774903003") + offer_html("TX222A", 2662000, code="5") + offer_html("TY618D", 3029000, code="7"),
                      "2": offer_html("TY618D", 3029000, code="8")}
             collect_open_market(out, day, 8, ["gpu"], fetch_factory=lambda category: (lambda code: pages[code]))

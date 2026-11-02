@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Callable
 
 from .core import make_session, write_csv
-from .listings import Listings, split
+from .listings import ELEVEN, Listings, split
 from .price_outliers import CONSENSUS_MALLS, OUTLIER_RATIO, _SKIP_NAME, _int
 
 
@@ -139,6 +139,11 @@ def collect_category(output_dir: Path, day: str, hour: int, category: str, fetch
     started = time.time()
     with ThreadPoolExecutor(max_workers=WORKERS) as pool:
         fetched = list(pool.map(get, products))
+    # 가장 싼 판매가 11번가면 스토어를 미리 병렬로 읽어 둔다 (막아 둔 스토어 확인용, 한 번 읽은 상품은 기록돼 다시 안 읽음)
+    if listings.block_stores:
+        codes = {offers[0]["code"] for offers in fetched if offers and offers[0].get("mall") in ELEVEN and offers[0].get("code")}
+        with ThreadPoolExecutor(max_workers=WORKERS) as pool:
+            list(pool.map(listings.store_of, codes))
 
     rows, failed, skipped = [], 0, 0
     for (code, name, all_mall), offers in zip(products, fetched):
