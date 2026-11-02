@@ -6,10 +6,10 @@ from pathlib import Path
 from danawa_crawler.price_outliers import clean_lowest, fix_price_outliers, parse_mall_prices
 
 
-def mall_item(mall: str, price: int, cash: bool = False) -> str:
+def mall_item(mall: str, price: int, cash: bool = False, code: str = "9") -> str:
     badge = '<span class="badge__cash">현금</span>' if cash else ""
     return (f'<li class="list-item">{badge}<a href="https://prod.danawa.com/bridge/loadingBridge.html?pcode=1&cmpnyc={mall}'
-            f'&link_pcode=9">x</a><span class="text__num">{price:,}</span><span class="text__unit">원</span></li>')
+            f'&link_pcode={code}">x</a><span class="text__num">{price:,}</span><span class="text__unit">원</span></li>')
 
 
 def mall_page(*items: str) -> str:
@@ -154,6 +154,42 @@ class FixTests(unittest.TestCase):
 
             self.assertEqual([], fix_price_outliers(out, day, 10, ["gpu"], fetch_factory=factory))
             self.assertEqual("576000", {r["product_code"]: r[day] for r in read_rows(out / "latest" / "gpu.csv")}["50"])
+
+    def test_new_gmarket_listings_are_fake_old_one_is_kept(self):
+        # 2026-11-01 사기 판매자(새 상품번호 48942xxxxx) vs 오래된 G마켓 상품의 실제 행사가
+        day = "2026-11-02"
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            header = ["product_code", "product_name", day, "2026-11-01"]
+            rows = [[str(i), f"RTX 5080 정상 {i}", str(2990000 + i * 1000), "3000000"] for i in range(1, 8)]
+            rows += [["20", "새 G마켓 사기가 + 다른 몰", "2311990", "3029000"],   # → 다른 몰 최저가로
+                     ["21", "새 G마켓 사기가 단독", "1950720", ""],             # → 빼기
+                     ["22", "오래된 G마켓 단독 저가", "2311990", "2311990"],    # → 유지 (시세보다 싸도)
+                     ["23", "새 G마켓 여럿 + 11번가", "2091990", "2662000"],    # 계정 여러 개 → 11번가 가격으로
+                     ["24", "새 G마켓 시세 근처", "2800000", "3000000"]]        # 믿을 만한 가격의 90% 이상 → 유지
+            write_price_csv(out / "latest" / "gpu.csv", header, rows)
+            write_price_csv(out / "specs" / "gpu_specs.csv",
+                            ["collected_at", "product_code", "product_name", "product_url", "chipset", "interface", "memory_type", "memory_size"],
+                            [["d", row[0], "x", "u", "RTX 5080", "", "", "16GB"] for row in rows])
+            pages = {
+                "20": mall_page(mall_item("EE128", 2311990, code="4894257337"), mall_item("EE715", 3029000, code="F702607886"), mall_item("TY618D", 3029000)),
+                "21": mall_page(mall_item("EE128", 1950720, code="4894257384")),
+                "22": mall_page(mall_item("EE128", 2311990, code="4774903003"), mall_item("TY618D", 3029000)),
+                "23": mall_page(mall_item("EE128", 2091990, code="4894264936"), mall_item("EE128", 2215990, code="4894264197"),
+                                mall_item("EE128", 2331990, code="4894266279"), mall_item("TX222A", 2662000)),
+                "24": mall_page(mall_item("EE128", 2800000, code="4894270000"), mall_item("TY618D", 3029000)),
+            }
+            results = fix_price_outliers(out, day, 8, ["gpu"], fetch_factory=lambda category: (lambda code: pages[code]))
+            latest = {row["product_code"]: row[day] for row in read_rows(out / "latest" / "gpu.csv")}
+            self.assertEqual("3029000", latest["20"])
+            self.assertEqual("", latest["21"])
+            self.assertEqual("2311990", latest["22"])
+            self.assertEqual("2662000", latest["23"])
+            self.assertEqual("2800000", latest["24"])
+            logged = {row["product_code"]: row["removed"] for row in results}
+            self.assertEqual({"20", "21", "23"}, set(logged))
+            self.assertIn("EE128:2311990(새 G마켓 상품 4894257337, 믿을 만한 가격 2,992,000)", logged["20"])
+            self.assertIn("(새 G마켓·옥션 상품 단독)", logged["21"])
 
     def test_failed_page_keeps_price(self):
         day = "2026-10-04"

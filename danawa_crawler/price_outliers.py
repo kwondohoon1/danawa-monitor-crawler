@@ -5,6 +5,9 @@ every other mall (a scam seller), that fake price becomes the product's "lowest 
 whose price suddenly dropped (or that are new), open the product page, read the per-mall price list,
 remove prices that sit far below the other malls, and keep the cheapest remaining price instead.
 
+Brand-new G마켓·옥션 listings far below the believable price are removed first (listings.py — the
+2026-11 scam wave), and established G마켓·옥션 listings are never removed even when they stand alone.
+
 Every change is written to data/hourly/<day>/price_fixes.csv so the fake prices can still be found.
 """
 
@@ -19,6 +22,7 @@ from pathlib import Path
 from typing import Callable
 
 from .core import make_session, write_csv
+from .listings import NEW_RATIO, Listings, split
 
 
 CATE_CODES = {"gpu": "112753", "ram": "112752", "ssd": "112760"}
@@ -33,11 +37,12 @@ FIX_FIELDS = ["hour", "category", "product_code", "product_name", "crawled_price
 _LIST = re.compile(r'class="list__mall-price"(.*?)</ul>', re.S)
 _ITEM = re.compile(r"<li(.*?)</li>", re.S)
 _MALL = re.compile(r"cmpnyc=(\w+)")
+_CODE = re.compile(r"link_pcode=(\w+)")
 _PRICE = re.compile(r'class="text__num">([\d,]+)<')
 
 
-def parse_mall_prices(html: str) -> list[tuple[int, str]]:
-    """(price, mall code) of the '쇼핑몰별 최저가' list, cash-only prices excluded."""
+def parse_mall_offers(html: str) -> list[dict]:
+    """[{price, mall(코드), code(그 쇼핑몰 상품번호)}] of the '쇼핑몰별 최저가' list, cash-only prices excluded."""
     block = _LIST.search(html)
     if not block:
         return []
@@ -45,10 +50,15 @@ def parse_mall_prices(html: str) -> list[tuple[int, str]]:
     for item in _ITEM.findall(block.group(1)):
         if "badge__cash" in item:
             continue
-        mall, price = _MALL.search(item), _PRICE.search(item)
+        mall, price, code = _MALL.search(item), _PRICE.search(item), _CODE.search(item)
         if mall and price:
-            rows.append((int(price.group(1).replace(",", "")), mall.group(1)))
-    return sorted(rows)
+            rows.append({"price": int(price.group(1).replace(",", "")), "mall": mall.group(1), "code": code.group(1) if code else ""})
+    return sorted(rows, key=lambda o: o["price"])
+
+
+def parse_mall_prices(html: str) -> list[tuple[int, str]]:
+    """(price, mall code) of the '쇼핑몰별 최저가' list, cash-only prices excluded."""
+    return [(o["price"], o["mall"]) for o in parse_mall_offers(html)]
 
 
 def clean_lowest(prices: list[tuple[int, str]], baseline: int | None = None) -> tuple[int | None, list[tuple[int, str]]]:
@@ -184,6 +194,7 @@ def fix_category(output_dir: Path, day: str, hour: int, category: str, fetch: Ca
     col = header.index(day)
     base = _baselines(output_dir, day, hour, category, header, rows)
     keys = spec_keys(output_dir, category)
+    listings = Listings(output_dir)
 
     # 같은 스펙 상품들의 오늘 시세(중간값). 판매처가 적은 상품은 자기 쇼핑몰 목록만으로는 기준을 못 잡으므로
     # (비싼 판매처 한두 곳이 기준이 돼 정상가를 빼던 문제) 시세를 기준으로 판단한다.
@@ -204,9 +215,12 @@ def fix_category(output_dir: Path, day: str, hour: int, category: str, fetch: Ca
             continue
         before = base.get(row[0])
         median = market.get(keys.get(row[0], ""))
-        if median:
-            # 시세보다 15% 넘게 싸면 확인. 새 상품은 사기 의심 쇼핑몰 단독인지 보려고 확인(가격은 안 바꿈)
-            if price < median * OUTLIER_RATIO or before is None:
+        if row[0] in listings.block_products:
+            candidates.append((0.0, row[0], row[1], price, before, median))      # 수동 제외 상품
+        elif median:
+            # 시세보다 10% 넘게 싸면 확인(새 G마켓·옥션 상품은 10%, 그 밖은 15% 기준으로 뺀다).
+            # 새 상품은 사기 의심 쇼핑몰 단독인지 보려고 확인(가격은 안 바꿈)
+            if price < median * NEW_RATIO or before is None:
                 candidates.append((price / median, row[0], row[1], price, before, median))
         elif before is None or price < before * DROP_RATIO:
             # 스펙 묶음이 없으면 예전 방식: 직전 가격 대비 급락·새 상품을 상품 안 쇼핑몰끼리 비교
@@ -220,30 +234,42 @@ def fix_category(output_dir: Path, day: str, hour: int, category: str, fetch: Ca
 
     def check(item):
         _, code, name, price, before, median = item
+        if code in listings.block_products:
+            return {"code": code, "name": name, "price": price, "before": before, "clean": 0, "removed": [], "kept": set(),
+                    "median": median, "scam": [], "blocked": True}
         try:
-            mall_prices = parse_mall_prices(fetch(code))
+            offers = parse_mall_offers(fetch(code))
         except Exception as error:  # 페이지를 못 읽으면 그대로 둔다
             print(f"  {category} {code}: mall list failed ({error})", flush=True)
             return None
+        # 새 G마켓·옥션 상품의 사기 가격·수동 제외 상품번호를 먼저 뺀다. 오래된 G마켓·옥션 판매(trusted)는 아래 규칙에서도 안 뺀다.
+        offers, scam = split(offers, day, listings, median)
+        mall_prices = [(o["price"], o["mall"]) for o in offers]
+        trusted = {(o["price"], o["mall"]) for o in offers if o.get("trusted")}
+        lowest_fake = bool(scam) and not any(o["price"] <= price for o in offers)     # 목록 최저가 자체가 사기 가격이었음
         if median:
             floor = median * OUTLIER_RATIO
-            removed = [row for row in mall_prices if row[0] < floor]
-            ok = [row for row in mall_prices if row[0] >= floor]
+            removed = [row for row in mall_prices if row[0] < floor and row not in trusted]
+            ok = [row for row in mall_prices if row not in removed]
             near = [row for row in mall_prices if row[0] <= price * 1.1]
-            if price >= floor or len(near) >= CONSENSUS_MALLS:
-                clean = price                                  # 시세 범위, 또는 여러 쇼핑몰이 같은 값 → 그대로
+            if not lowest_fake and (price >= floor or len(near) >= CONSENSUS_MALLS or (mall_prices and mall_prices[0] in trusted)):
+                clean = price                                  # 시세 범위, 여러 쇼핑몰이 같은 값, 오래된 G마켓·옥션 판매 → 그대로
                 removed = []
             else:
                 clean = ok[0][0] if ok else 0                  # 시세 범위의 가장 싼 쇼핑몰, 없으면 0(사기 의심 쇼핑몰 단독일 때만 빼기)
         else:
             clean, removed = clean_lowest(mall_prices, before)
+            removed = [row for row in removed if row not in trusted]
+            kept_rows = [row for row in mall_prices if row not in removed]
+            clean = kept_rows[0][0] if kept_rows else (0 if lowest_fake else clean)
         kept_malls = {mall for value, mall in mall_prices if (value, mall) not in removed}
         return {"code": code, "name": name, "price": price, "before": before, "clean": clean, "removed": removed,
-                "kept": kept_malls, "median": median}
+                "kept": kept_malls, "median": median, "scam": scam, "lowest_fake": lowest_fake}
 
     started = time.time()
     with ThreadPoolExecutor(max_workers=WORKERS) as pool:
         checked = [result for result in pool.map(check, candidates) if result]
+    listings.save()
 
     def log_row(c, fixed: str, removed: str) -> dict[str, str]:
         return {"hour": f"{hour:02d}", "category": category, "product_code": c["code"], "product_name": c["name"],
@@ -251,16 +277,25 @@ def fix_category(output_dir: Path, day: str, hour: int, category: str, fetch: Ca
                 "removed": removed}
 
     def removed_text(c) -> str:
-        text = " ".join(f"{mall}:{value}" for value, mall in c["removed"])
+        parts = [f"{o['mall']}:{o['price']}({why})" for o, why in c.get("scam", [])]
+        parts += [f"{mall}:{value}" for value, mall in c["removed"]]
+        text = " ".join(parts)
         return f"{text} (같은 스펙 시세 {c['median']})" if c["median"] else text
 
-    # 1차: 시세(또는 상품 안 다른 쇼핑몰)보다 크게 싼 가격을 빼고 다음 최저가로, 남는 쇼핑몰이 없으면 빼기
+    # 1차: 시세(또는 상품 안 다른 쇼핑몰)보다 크게 싼 가격·새 G마켓·옥션 사기 가격을 빼고 다음 최저가로,
+    #      남는 쇼핑몰이 없으면(사기 판매 단독) 빼기. 수동 제외 상품도 빼기
     fixes: dict[str, str] = {}
     results = []
     for c in checked:
-        if c["clean"] and c["clean"] > c["price"]:
+        if c.get("blocked"):
+            fixes[c["code"]] = ""
+            results.append(log_row(c, "", "(수동 제외 상품)"))
+        elif c["clean"] and c["clean"] > c["price"]:
             fixes[c["code"]] = str(c["clean"])
             results.append(log_row(c, str(c["clean"]), removed_text(c)))
+        elif c.get("lowest_fake") and not c["clean"]:
+            fixes[c["code"]] = ""
+            results.append(log_row(c, "", removed_text(c) + " (새 G마켓·옥션 상품 단독)"))
 
     # 2차: 이번에 여러 번 빠진 쇼핑몰(사기 의심)에서만 파는 '새로 나타난' 상품은 뺀다
     # — 사기 업체가 직접 올린 상품의 전형(예: ASUS RTX 5080 NOCTUA 2,180,000원, TH201 단독)
