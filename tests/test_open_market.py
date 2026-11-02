@@ -110,7 +110,7 @@ class CollectTests(unittest.TestCase):
 
             collect_open_market(out, day, 8, ["gpu"], fetch_factory=factory)
             rows = {r["product_code"]: r for r in read_rows(out / "latest" / "gpu_open.csv")}
-            self.assertEqual(("3029000", "EE715몰", "3029000", "TY618D몰"), (rows["1"]["price"], rows["1"]["mall"], rows["1"]["price2"], rows["1"]["mall2"]))
+            self.assertEqual(("3029000", "TY618D몰", "3029000", "EE715몰"), (rows["1"]["price"], rows["1"]["mall"], rows["1"]["price2"], rows["1"]["mall2"]))
             self.assertIn("EE128몰:2311990(새 G마켓 상품 4894257337, 믿을 만한 가격 3,029,000)", rows["1"]["removed"])
             self.assertEqual("1950720", rows["2"]["price"])
             self.assertEqual(("2311990", "EE128몰", "3029000"), (rows["3"]["price"], rows["3"]["mall"], rows["3"]["price2"]))
