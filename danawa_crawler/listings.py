@@ -11,7 +11,7 @@ G마켓·옥션 상품 페이지는 봇 차단(403)이라 판매자 정보를 �
   - 새 G마켓·옥션 상품이 믿을 만한 가격(새 상품이 아닌 판매들 중 최저가, 같은 스펙 시세)보다 NEW_RATIO 넘게
     싸면 사기로 보고 뺀다. 여러 개가 같이 싸도(계정 여러 개) 마찬가지.
   - 오래된 G마켓·옥션 상품은 혼자 싸도 빼지 않는다 (trusted).
-  - data/blocked_listings.csv 에 적은 상품번호(또는 다나와 상품코드)는 무조건 뺀다.
+  - data/blocked_listings.csv 에 적은 상품번호·쇼핑몰 전체(예: 판매를 안 하는데 가격만 남은 스마트스토어)·다나와 상품코드는 무조건 뺀다.
 """
 
 from __future__ import annotations
@@ -58,6 +58,7 @@ class Listings:
         self.seen: dict[tuple[str, str], str] = {}
         self.block_listings: set[tuple[str, str]] = set()
         self.block_products: set[str] = set()
+        self.block_malls: set[str] = set()
         self._lock = threading.Lock()
         self._dirty = False
         if self.path.exists():
@@ -73,6 +74,8 @@ class Listings:
                         self.block_listings.add((mall, link))
                     elif code:
                         self.block_products.add(code)
+                    elif mall:
+                        self.block_malls.add(mall)          # 쇼핑몰 전체
 
     def first_seen(self, mall: str, link_pcode: str, day: str) -> str:
         key = (mall, link_pcode)
@@ -90,7 +93,7 @@ class Listings:
         return _days(day, self.first_seen(mall, link_pcode, day)) < NEW_DAYS
 
     def is_blocked(self, mall: str, link_pcode: str) -> bool:
-        return (mall, link_pcode) in self.block_listings or ("", link_pcode) in self.block_listings
+        return mall in self.block_malls or (mall, link_pcode) in self.block_listings or ("", link_pcode) in self.block_listings
 
     def save(self) -> None:
         if not self._dirty:
