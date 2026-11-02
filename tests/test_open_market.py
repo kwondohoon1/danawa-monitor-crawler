@@ -127,13 +127,13 @@ class CollectTests(unittest.TestCase):
             out = Path(tmp)
             (out / "latest").mkdir()
             (out / "latest" / "gpu.csv").write_text(f"product_code,product_name,{day}\n1,A,3000000\n2,B,3000000\n", encoding="utf-8-sig")
-            (out / "blocked_listings.csv").write_text("product_code,mall,link_pcode,note\n,EE128,4774903003,사기\n2,,,상품 전체 제외\n", encoding="utf-8-sig")
-            pages = {"1": offer_html("EE128", 2311990, code="4774903003") + offer_html("TY618D", 3029000, code="7"),
+            (out / "blocked_listings.csv").write_text("product_code,mall,link_pcode,note\n,EE128,4774903003,사기\n2,,,상품 전체 제외\n,TX222A,,판매 안 함\n", encoding="utf-8-sig")
+            pages = {"1": offer_html("EE128", 2311990, code="4774903003") + offer_html("TX222A", 2662000, code="5") + offer_html("TY618D", 3029000, code="7"),
                      "2": offer_html("TY618D", 3029000, code="8")}
             collect_open_market(out, day, 8, ["gpu"], fetch_factory=lambda category: (lambda code: pages[code]))
             rows = {r["product_code"]: r for r in read_rows(out / "latest" / "gpu_open.csv")}
             self.assertEqual(["1"], sorted(rows))
-            self.assertEqual(("3029000", "EE128몰:2311990(수동 제외)"), (rows["1"]["price"], rows["1"]["removed"]))
+            self.assertEqual(("3029000", "EE128몰:2311990(수동 제외) TX222A몰:2662000(수동 제외)"), (rows["1"]["price"], rows["1"]["removed"]))
 
     def test_failed_fetch_keeps_previous_row(self):
         day = "2026-10-07"
