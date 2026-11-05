@@ -71,6 +71,40 @@ def get_session() -> requests.Session:
     return session
 
 
+def drop_session(local: threading.local) -> None:
+    """Make the next attempt open a new connection.
+
+    One keep-alive connection stays on the same Danawa server, so when that server sends an odd page
+    (or blocks), every retry on the same session fails the same way.
+    """
+    session = getattr(local, "session", None)
+    local.session = None
+    if session is not None:
+        session.close()
+
+
+def keep_previous_specs(output_path: Path, rows: list[dict[str, str]], fields: list[str]) -> int:
+    """Products that failed this time keep the row that succeeded last time. Returns how many were kept.
+
+    (2026-11-05 484 TV products were saved with empty specs because one crawl could not read them.)
+    """
+    if not output_path.exists():
+        return 0
+    with output_path.open("r", encoding="utf-8-sig", newline="") as file:
+        previous = {row["product_code"]: row for row in csv.DictReader(file) if row.get("fetch_status") == "ok"}
+    kept = 0
+    for index, row in enumerate(rows):
+        old = previous.get(row["product_code"]) if row["fetch_status"] == "error" else None
+        if old:
+            rows[index] = {**{field: old.get(field, "") for field in fields}, "product_name": row["product_name"]}
+            kept += 1
+    return kept
+
+
+def too_many_errors(errors: int, total: int, max_error_share: float) -> bool:
+    return errors > total * max_error_share
+
+
 def load_monitor_inputs(path: Path, limit: int | None = None) -> list[MonitorInput]:
     rows: list[MonitorInput] = []
     with path.open("r", encoding="utf-8-sig", newline="") as file:
@@ -96,15 +130,28 @@ def load_monitor_inputs(path: Path, limit: int | None = None) -> list[MonitorInp
     return rows
 
 
+# 2026-11 다나와가 상품 페이지를 새 디자인(Next.js)으로 바꾸는 중이라 연결마다 옛 페이지와 새 페이지가 섞여 온다.
+# 옛 페이지는 .spec_list .items, 새 페이지는 [data-testid="ProductHeader-specs"] 에 같은 스펙 요약이 있다.
+# (새 페이지를 못 읽어 11/3부터 모니터·키보드·노트북 스펙 수집이 실패하고 TV 스펙 484개가 빈 칸으로 저장됐음)
+SPEC_SELECTORS = (".spec_list .items", ".spec_list", '[data-testid="ProductHeader-specs"]')
+
+
+def spec_container(soup: BeautifulSoup):
+    for selector in SPEC_SELECTORS:
+        node = soup.select_one(selector)
+        if node is not None:
+            return node
+    return None
+
+
 def has_spec_container(html: str) -> bool:
     """True when the product page has a spec block, even an empty one."""
-    return BeautifulSoup(html, "html.parser").select_one(".spec_list") is not None
+    return spec_container(BeautifulSoup(html, "html.parser")) is not None
 
 
 def spec_tokens(html: str) -> list[str]:
-    soup = BeautifulSoup(html, "html.parser")
-    spec = soup.select_one(".spec_list .items") or soup.select_one(".spec_list")
-    if not spec:
+    spec = spec_container(BeautifulSoup(html, "html.parser"))
+    if spec is None:
         return []
     return [normalize_space(token) for token in spec.stripped_strings if normalize_space(token)]
 
@@ -115,6 +162,8 @@ def clean_spec_value(value: str) -> str:
     value = re.sub(r"\s*↔\s*", " ↔ ", value)
     value = re.sub(r"\s*:\s*", ": ", value)
     value = re.sub(r"(?<=\d):\s+(?=\d)", ":", value)
+    # 새 디자인 페이지는 '출시가: 263,000 원'처럼 '원'이 따로 떨어져 있다 (옛 페이지는 '263,000원')
+    value = re.sub(r"(?<=\d)\s+원(?![가-힣])", "원", value)
     return value
 
 
@@ -337,6 +386,7 @@ def fetch_one(item: MonitorInput, collected_at: str, timeout: int, retries: int)
             return row
         except Exception as exc:  # noqa: BLE001
             last_error = f"{type(exc).__name__}: {exc}"
+            drop_session(_thread_local)
             if attempt <= retries:
                 time.sleep(min(2.0, 0.25 * attempt))
     return empty_row(item, collected_at, "error", last_error)
@@ -377,6 +427,9 @@ def crawl_monitor_specs(
 
     ordered = [row for row in results if row is not None]
     errors = sum(1 for row in ordered if row["fetch_status"] == "error")
+    if errors:
+        kept = keep_previous_specs(output_path, ordered, SPEC_FIELDS)
+        print(f"monitor specs: {errors}/{len(ordered)} failed, {kept} kept from the previous file")
     write_csv(output_path, ordered)
     return len(ordered), errors
 
@@ -389,7 +442,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--timeout", type=int, default=20, help="Request timeout in seconds.")
     parser.add_argument("--retries", type=int, default=2, help="Retries per product.")
     parser.add_argument("--limit", type=int, help="Limit products for testing.")
-    parser.add_argument("--fail-on-error", action="store_true", help="Exit with error if any product fails.")
+    parser.add_argument("--fail-on-error", action="store_true", help="Exit with error if products fail.")
+    parser.add_argument(
+        "--max-error-share", type=float, default=0.0,
+        help="With --fail-on-error, only fail when more than this share of products fail (0 = any).",
+    )
     return parser
 
 
@@ -404,7 +461,7 @@ def main(argv: list[str] | None = None) -> int:
         limit=args.limit,
     )
     print(f"saved {total} monitor specs to {args.output} ({errors} errors)")
-    if args.fail_on_error and errors:
+    if args.fail_on_error and too_many_errors(errors, total, args.max_error_share):
         return 2
     return 0
 

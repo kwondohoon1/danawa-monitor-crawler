@@ -15,6 +15,7 @@ import requests
 
 from danawa_crawler.core import DEFAULT_USER_AGENT, normalize_space
 from danawa_crawler.monitor_specs import (
+    drop_session,
     has_spec_container,
     join_tokens,
     parse_registration_month,
@@ -255,6 +256,7 @@ def fetch_one(
             return row
         except Exception as exc:  # noqa: BLE001
             last_error = f"{type(exc).__name__}: {exc}"
+            drop_session(_thread_local)
             if attempt <= retries:
                 time.sleep(min(2.0, 0.25 * attempt))
     return empty_row(component, item, collected_at, "error", last_error)

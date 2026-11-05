@@ -2,6 +2,7 @@ import csv
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from danawa_crawler.open_market import collect_open_market, parse_offers, pick, shipping_fee
 
@@ -92,6 +93,25 @@ class ElevenStoreTests(unittest.TestCase):
             offers = [{"price": 1868370, "mall": "TH201", "code": "9490264322"}]
             kept, removed = split(offers, "2026-11-02", Listings(out, fetch_store=fail))
             self.assertEqual((offers, []), (kept, removed))
+
+    def test_store_lookup_gives_up_when_11st_blocks(self):
+        # 11번가가 GitHub 서버를 502로 막았을 때 상품마다 기다리다 매시 수집이 몇 시간씩 늘어졌다 (2026-11-03~05)
+        from danawa_crawler.listings import STORE_FAIL_LIMIT, Listings
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            asked = []
+
+            def fail(code):
+                asked.append(code)
+                raise OSError("502 Bad Gateway")
+
+            listings = Listings(out, fetch_store=fail)
+            with mock.patch("builtins.print"):
+                for code in [str(n) for n in range(STORE_FAIL_LIMIT + 20)] + ["0", "1"]:
+                    self.assertEqual(("", ""), listings.store_of(code))
+            self.assertEqual([str(n) for n in range(STORE_FAIL_LIMIT)], asked)   # same product never asked twice
+            listings.save()
+            self.assertFalse((out / "state" / "eleven_stores.csv").exists())    # failures are not written down
 
 
 class CollectTests(unittest.TestCase):

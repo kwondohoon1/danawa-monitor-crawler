@@ -1,9 +1,10 @@
 import csv
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
-from danawa_crawler.price_outliers import clean_lowest, fix_price_outliers, parse_mall_prices
+from danawa_crawler.price_outliers import clean_lowest, fix_price_outliers, parse_mall_offers, parse_mall_prices
 
 
 def mall_item(mall: str, price: int, cash: bool = False, code: str = "9") -> str:
@@ -36,6 +37,19 @@ class ParseTests(unittest.TestCase):
 
     def test_missing_list(self):
         self.assertEqual([], parse_mall_prices("<html></html>"))
+
+    def test_reads_new_product_page(self):
+        # 새 디자인 상품 페이지(2026-11~)는 쇼핑몰 목록이 Next.js 데이터(shopTableRows)에 있다. 여러 push 로 나뉘어 온다.
+        rows = [
+            {"logo": "11번가", "companyCode": "TH201", "linkProductCode": "9490264322", "isLowest": True, "isCash": False, "price": "1,534,160"},
+            {"logo": "현금몰", "companyCode": "PXC11", "linkProductCode": "", "isLowest": False, "isCash": True, "price": "1,500,000"},
+            {"logo": "G마켓", "companyCode": "EE128", "linkProductCode": "4489", "isLowest": False, "isCash": False, "price": "2,445,900"},
+        ]
+        payload = "2f:" + json.dumps({"lowestPrice": "1,534,160", "shopTableRows": rows}, ensure_ascii=False) + "\n"
+        html = "".join(f"<script>self.__next_f.push([1,{json.dumps(part, ensure_ascii=False)}])</script>"
+                       for part in (payload[:70], payload[70:]))
+        self.assertEqual([(1534160, "TH201"), (2445900, "EE128")], parse_mall_prices(html))
+        self.assertEqual("9490264322", parse_mall_offers(html)[0]["code"])
 
 
 class CleanTests(unittest.TestCase):

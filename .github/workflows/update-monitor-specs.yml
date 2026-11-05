@@ -21,6 +21,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # A queued run (same concurrency group) would otherwise check out the commit from when it was
+          # triggered and then conflict with what the runs before it pushed. Take the branch tip at start.
+          ref: ${{ github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -37,7 +41,10 @@ jobs:
         run: python -m unittest discover -s tests
 
       - name: Crawl monitor specs
-        run: python scripts/crawl_monitor_specs.py --workers 32 --timeout 20 --retries 3 --fail-on-error
+        # Products that fail keep their previous specs, so the CSV is committed either way.
+        id: crawl
+        continue-on-error: true
+        run: python scripts/crawl_monitor_specs.py --workers 32 --timeout 20 --retries 3 --fail-on-error --max-error-share 0.05
 
       - name: Commit CSV changes
         run: |
@@ -54,3 +61,9 @@ jobs:
           else
             echo "No monitor specs changes"
           fi
+
+      - name: Fail when many products could not be read
+        if: steps.crawl.outcome == 'failure'
+        run: |
+          echo "::error::More than 5% of products could not be read (their previous specs were kept and committed). Check whether Danawa changed its product page."
+          exit 1

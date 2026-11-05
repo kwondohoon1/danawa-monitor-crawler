@@ -15,10 +15,13 @@ import requests
 
 from danawa_crawler.core import DEFAULT_USER_AGENT, normalize_space
 from danawa_crawler.monitor_specs import (
+    drop_session,
     has_spec_container,
     join_tokens,
+    keep_previous_specs,
     parse_registration_month,
     spec_tokens,
+    too_many_errors,
     value_tokens,
 )
 
@@ -307,6 +310,7 @@ def fetch_one(item: KeyboardInput, collected_at: str, timeout: int, retries: int
             return row
         except Exception as exc:  # noqa: BLE001
             last_error = f"{type(exc).__name__}: {exc}"
+            drop_session(_thread_local)
             if attempt <= retries:
                 time.sleep(min(2.0, 0.25 * attempt))
     return empty_row(item, collected_at, "error", last_error)
@@ -344,6 +348,9 @@ def crawl_keyboard_specs(
 
     ordered = [row for row in results if row is not None]
     errors = sum(1 for row in ordered if row["fetch_status"] == "error")
+    if errors:
+        kept = keep_previous_specs(output_path, ordered, SPEC_FIELDS)
+        print(f"keyboard specs: {errors}/{len(ordered)} failed, {kept} kept from the previous file")
     write_csv(output_path, ordered)
     return len(ordered), errors
 
@@ -356,7 +363,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--timeout", type=int, default=20, help="Request timeout in seconds.")
     parser.add_argument("--retries", type=int, default=2, help="Retries per product.")
     parser.add_argument("--limit", type=int, help="Limit products for testing.")
-    parser.add_argument("--fail-on-error", action="store_true", help="Exit with error if any product fails.")
+    parser.add_argument("--fail-on-error", action="store_true", help="Exit with error if products fail.")
+    parser.add_argument(
+        "--max-error-share", type=float, default=0.0,
+        help="With --fail-on-error, only fail when more than this share of products fail (0 = any).",
+    )
     return parser
 
 
@@ -371,7 +382,7 @@ def main(argv: list[str] | None = None) -> int:
         limit=args.limit,
     )
     print(f"saved {total} keyboard specs to {args.output} ({errors} errors)")
-    if args.fail_on_error and errors:
+    if args.fail_on_error and too_many_errors(errors, total, args.max_error_share):
         return 2
     return 0
 

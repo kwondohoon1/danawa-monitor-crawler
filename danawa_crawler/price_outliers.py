@@ -14,6 +14,7 @@ Every change is written to data/hourly/<day>/price_fixes.csv so the fake prices 
 from __future__ import annotations
 
 import csv
+import json
 import re
 import time
 from collections import Counter
@@ -21,7 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
-from .core import make_session, write_csv
+from .core import make_session, next_flight_text, write_csv
 from .listings import NEW_RATIO, Listings, split
 
 
@@ -41,11 +42,38 @@ _CODE = re.compile(r"link_pcode=(\w+)")
 _PRICE = re.compile(r'class="text__num">([\d,]+)<')
 
 
+def _shop_table_rows(html: str) -> list[dict]:
+    """'쇼핑몰별 최저가' rows of Danawa's new (Next.js) product page — the same list as the old list__mall-price."""
+    text = next_flight_text(html)
+    decoder = json.JSONDecoder()
+    marker = '"shopTableRows":'
+    start = 0
+    while (index := text.find(marker, start)) >= 0:
+        position = index + len(marker)
+        while position < len(text) and text[position].isspace():
+            position += 1
+        try:
+            value, _ = decoder.raw_decode(text, position)
+        except ValueError:
+            value = None
+        if isinstance(value, list):
+            return [row for row in value if isinstance(row, dict)]
+        start = index + len(marker)
+    return []
+
+
 def parse_mall_offers(html: str) -> list[dict]:
     """[{price, mall(코드), code(그 쇼핑몰 상품번호)}] of the '쇼핑몰별 최저가' list, cash-only prices excluded."""
     block = _LIST.search(html)
     if not block:
-        return []
+        # 새 디자인 상품 페이지(2026-11~). 예전엔 목록을 못 찾아 빈 목록 → 사기 가격 확인을 조용히 건너뛰었다.
+        rows = []
+        for row in _shop_table_rows(html):
+            price = re.sub(r"[^\d]", "", str(row.get("price", "")))
+            if row.get("isCash") or not price or not row.get("companyCode"):
+                continue
+            rows.append({"price": int(price), "mall": str(row["companyCode"]), "code": str(row.get("linkProductCode") or "")})
+        return sorted(rows, key=lambda o: o["price"])
     rows = []
     for item in _ITEM.findall(block.group(1)):
         if "badge__cash" in item:

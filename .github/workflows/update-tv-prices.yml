@@ -21,6 +21,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # A queued run (same concurrency group) would otherwise check out the commit from when it was
+          # triggered and then conflict with what the runs before it pushed. Take the branch tip at start.
+          ref: ${{ github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v5

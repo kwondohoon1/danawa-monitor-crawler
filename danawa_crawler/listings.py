@@ -25,7 +25,9 @@ from datetime import date
 from pathlib import Path
 from typing import Callable
 
-from .core import make_session, write_csv
+import requests
+
+from .core import DEFAULT_USER_AGENT, write_csv
 
 
 ESM = {"EE128": "G마켓", "EE715": "옥션"}
@@ -40,11 +42,17 @@ BLOCK_FIELDS = ["product_code", "mall", "link_pcode", "store", "note"]
 ELEVEN = {"TH201", "TY618D"}                 # 다나와의 11번가 쇼핑몰 코드
 STORE_FIELDS = ["link_pcode", "store_no", "store_name"]
 _STORE = re.compile(r'storeNo:\s*(\d+),\s*storeName:\s*"([^"]*)"')
+STORE_FAIL_LIMIT = 5         # 한 번 확인하는 동안 이만큼 실패하면 11번가가 막은 것으로 보고 남은 확인은 건너뛴다
 
 
 def fetch_store(link_pcode: str) -> tuple[str, str]:
-    """11번가 상품 페이지에서 (스토어 번호, 스토어 이름). 못 읽으면 ('', '')."""
-    response = make_session().get(f"https://www.11st.co.kr/products/{link_pcode}", timeout=15)
+    """11번가 상품 페이지에서 (스토어 번호, 스토어 이름). 못 읽으면 ('', '').
+
+    한 번만 시도한다. 재시도 세션(make_session)은 502 한 번에 약 80초를 기다리는데, 11번가가 GitHub 서버를
+    502로 막아서 2026-11-03부터 매시 가격 수집이 몇 시간씩 늘어져 한 회차도 저장하지 못했다.
+    """
+    response = requests.get(f"https://www.11st.co.kr/products/{link_pcode}",
+                            headers={"User-Agent": DEFAULT_USER_AGENT}, timeout=10)
     response.raise_for_status()
     match = _STORE.search(response.text)
     return (match.group(1), match.group(2)) if match else ("", "")
@@ -77,6 +85,7 @@ class Listings:
         self.block_malls: set[str] = set()
         self.block_stores: set[str] = set()                     # 11번가 스토어 이름 또는 번호
         self._fetch_store = fetch_store
+        self._store_failed: set[str] = set()                    # 이번에 못 읽은 11번가 상품 (다시 안 읽음)
         self._lock = threading.Lock()
         self._dirty = False
         if self.path.exists():
@@ -125,10 +134,17 @@ class Listings:
         with self._lock:
             if link_pcode in self.stores:
                 return self.stores[link_pcode]
+            if link_pcode in self._store_failed or len(self._store_failed) >= STORE_FAIL_LIMIT:
+                return ("", "")                                 # 이번엔 모름 (같은 상품·막힌 11번가를 또 기다리지 않음)
         try:
             store = self._fetch_store(link_pcode)
-        except Exception as error:                              # 못 읽으면 이번엔 모름(기록 안 함)
+        except Exception as error:                              # 못 읽으면 이번엔 모름(파일에 기록 안 함)
+            with self._lock:
+                self._store_failed.add(link_pcode)
+                stop = len(self._store_failed) == STORE_FAIL_LIMIT
             print(f"  11st store lookup failed {link_pcode}: {error}", flush=True)
+            if stop:
+                print(f"  11st store lookup: {STORE_FAIL_LIMIT} failures, skipping the rest of this check", flush=True)
             return ("", "")
         with self._lock:
             self.stores[link_pcode] = store
