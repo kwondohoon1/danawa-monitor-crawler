@@ -46,12 +46,17 @@ jobs:
       - name: Record newly collected products
         run: python scripts/update_new_products.py --category monitor
 
+      - name: Crawl monitor prices with shipping fee
+        # 다나와 '배송비포함' 목록 가격(상품 페이지 최저가와 같은 기준) -> monitor_ship.csv. 실패해도 위 가격 CSV는 저장한다
+        continue-on-error: true
+        run: python scripts/crawl_danawa.py --category monitor --add-delivery --fail-on-empty --fetcher requests --max-pages 100 --delay 0.1
+
       - name: Commit CSV changes
         run: |
-          if [[ -n "$(git status --porcelain data/latest/monitor.csv data/history/monitor_price_history.csv data/new_products/monitor.csv data/state/known_products/monitor.csv)" ]]; then
+          if [[ -n "$(git status --porcelain data/latest/monitor.csv data/history/monitor_price_history.csv data/new_products/monitor.csv data/state/known_products/monitor.csv data/latest/monitor_ship.csv data/history/monitor_ship_price_history.csv)" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add data/latest/monitor.csv data/history/monitor_price_history.csv data/new_products/monitor.csv data/state/known_products/monitor.csv
+            git add data/latest/monitor.csv data/history/monitor_price_history.csv data/new_products/monitor.csv data/state/known_products/monitor.csv data/latest/monitor_ship.csv data/history/monitor_ship_price_history.csv
             git commit -m "Update monitor price CSV"
             for attempt in 1 2 3 4 5; do
               git pull --rebase origin main && git push && break

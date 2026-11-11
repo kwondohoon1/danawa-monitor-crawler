@@ -7,7 +7,7 @@ import math
 import re
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable
@@ -48,6 +48,7 @@ class Category:
     url: str
     pages: int | None = None
     start_page: int = 1
+    add_delivery: bool = False  # 목록 가격을 다나와 '배송비포함' 옵션으로 받음 (상품 페이지 최저가와 같은 기준)
 
 
 @dataclass(frozen=True)
@@ -446,7 +447,8 @@ def fetch_list_context(category: Category, list_count: int, timeout: int) -> Dan
         # Danawa pins the frontend variant to the TCP connection, so every attempt uses a fresh session.
         session = make_session()
         try:
-            return parse_list_context(fetch_with_requests(session, url, timeout))
+            context = parse_list_context(fetch_with_requests(session, url, timeout))
+            return replace(context, add_delivery="Y") if category.add_delivery else context
         except Exception as exc:  # noqa: BLE001
             last_error = exc
             print(f"[{category.slug}] list context attempt {attempt + 1} failed ({url}): {exc}")
@@ -1318,6 +1320,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip data/latest/danawa_products.csv update.",
     )
+    parser.add_argument(
+        "--add-delivery",
+        action="store_true",
+        help="Collect list prices including the shipping fee (Danawa '배송비포함') into <slug>_ship.csv files.",
+    )
     return parser
 
 
@@ -1355,6 +1362,9 @@ def main(argv: list[str] | None = None) -> int:
             )
             for category in categories
         ]
+    if args.add_delivery:
+        # 배송비 포함 가격은 기존 가격 CSV를 바꾸지 않고 <slug>_ship.csv 에 따로 쓴다
+        categories = [replace(category, slug=f"{category.slug}_ship", add_delivery=True) for category in categories]
     if args.max_pages < 1:
         raise CrawlerError("--max-pages must be at least 1")
     if args.history_days < 1:
@@ -1392,7 +1402,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"No products collected for: {', '.join(empty_categories)}", file=sys.stderr)
         return 2
 
-    write_latest(output_dir, products_by_category, collected_date, args.history_days, not args.skip_combined)
+    write_combined = not args.skip_combined and not args.add_delivery
+    write_latest(output_dir, products_by_category, collected_date, args.history_days, write_combined)
     write_history(output_dir, products_by_category, collected_date, args.history_file_days)
 
     total = sum(len(products) for products in products_by_category.values())

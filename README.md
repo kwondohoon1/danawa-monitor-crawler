@@ -40,6 +40,7 @@ CPU, 그래픽카드, 메인보드, RAM, SSD, HDD, 쿨러, 케이스, 파워는 
 ## 가격정보 바로가기
 
 - [모니터 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/monitor.csv)
+- [모니터 가격 (배송비 포함)](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/monitor_ship.csv) — 다나와 목록의 '배송비포함' 가격, 상품 페이지 최저가와 같은 기준
 - [키보드 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/keyboard.csv)
 - [노트북 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/laptop.csv)
 - [TV 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/tv.csv)
@@ -191,6 +192,7 @@ TV 스펙:
 ## History 바로가기
 
 - [모니터 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/monitor_price_history.csv)
+- [모니터 가격 (배송비 포함) 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/monitor_ship_price_history.csv)
 - [키보드 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/keyboard_price_history.csv)
 - [노트북 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/laptop_price_history.csv)
 - [TV 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/tv_price_history.csv)
@@ -206,7 +208,7 @@ TV 스펙:
 
 ## 자동 업데이트
 
-- 모니터 가격정보: 매일 06:00 KST에 수집
+- 모니터 가격정보: 매일 06:00 KST에 수집 (이어서 배송비 포함 가격 `monitor_ship.csv`도 수집)
 - 키보드/노트북 가격정보: 매일 07:00 KST에 수집
 - 그래픽카드/RAM/SSD 가격정보: 07:00~18:00 KST 매시간 정각에 수집 (그날 가격 칸을 최신 값으로 갱신, 시간대별 기록은 `data/hourly/날짜/`에 7일 보관)
 - TV 가격정보: 매일 07:30 KST에 수집
@@ -264,6 +266,12 @@ TV 스펙:
 ```bash
 pip install -r requirements.txt
 python scripts/crawl_danawa.py --category monitor --fail-on-empty --fetcher requests
+```
+
+모니터 가격 (배송비 포함) 수집 — `data/latest/monitor_ship.csv`, `data/history/monitor_ship_price_history.csv`:
+
+```bash
+python scripts/crawl_danawa.py --category monitor --add-delivery --fail-on-empty --fetcher requests
 ```
 
 키보드 가격 수집:
