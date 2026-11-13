@@ -29,8 +29,11 @@ from danawa_crawler.hourly_prices import (  # noqa: E402
     update_readme,
 )
 from danawa_crawler.component_specs import crawl_missing_specs  # noqa: E402
+from danawa_crawler.daily_watchdog import retry_failed_daily_runs  # noqa: E402
 from danawa_crawler.open_market import collect_open_market  # noqa: E402
 from danawa_crawler.price_outliers import fix_price_outliers  # noqa: E402
+
+WATCHDOG_EVERY = 15 * 60  # 다음 수집을 기다리는 동안 이 간격(초)으로 하루 수집 실패를 확인
 
 
 def run(command: list[str], check: bool = True) -> subprocess.CompletedProcess:
@@ -111,6 +114,22 @@ def collect(day: str, hour: int, categories: list[str], use_git: bool) -> None:
         commit_and_push(categories, f"Update GPU RAM SSD price CSV {day} {hour:02d}:00")
 
 
+def daily_watchdog() -> None:
+    # 하루 한 번 도는 수집(모니터 가격 등)이 오늘 실패했으면 다시 실행. 실패해도 매시 수집은 계속
+    try:
+        retry_failed_daily_runs(ROOT)
+    except Exception as error:
+        print(f"daily watchdog failed: {error}", flush=True)
+
+
+def sleep_with_watchdog(seconds: float, use_git: bool) -> None:
+    end = time.monotonic() + max(0.0, seconds)
+    while end - time.monotonic() > 0:
+        if use_git:
+            daily_watchdog()
+        time.sleep(min(WATCHDOG_EVERY, max(0.0, end - time.monotonic())))
+
+
 def hand_over() -> None:
     workflow = os.environ.get("HOURLY_WORKFLOW_FILE", "update-component-prices.yml")
     run(["gh", "workflow", "run", workflow, "--ref", "main"])
@@ -159,7 +178,7 @@ def main() -> int:
             return 0
         wait = (upcoming - now_kst()).total_seconds()
         print(f"Sleeping {wait / 60:.1f} min until {upcoming:%Y-%m-%d %H:%M} KST", flush=True)
-        time.sleep(max(0, wait) + 5)
+        sleep_with_watchdog(max(0, wait) + 5, use_git)
 
 
 if __name__ == "__main__":
