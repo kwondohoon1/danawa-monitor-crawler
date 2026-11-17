@@ -41,6 +41,7 @@ CPU, 그래픽카드, 메인보드, RAM, SSD, HDD, 쿨러, 케이스, 파워는 
 
 - [모니터 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/monitor.csv)
 - [모니터 가격 (배송비 포함)](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/monitor_ship.csv) — 다나와 목록의 '배송비포함' 가격, 상품 페이지 최저가와 같은 기준
+- [모니터 Mini LED 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/monitor_miniled.csv) — 다나와 모니터 목록에서 '디스플레이 기술 → Mini LED'를 체크한 목록
 - [키보드 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/keyboard.csv)
 - [노트북 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/laptop.csv)
 - [TV 가격](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/latest/tv.csv)
@@ -105,7 +106,7 @@ product_code,product_name,2026-05-19,2026-05-18,2026-05-17,...
 
 ## 스펙정보 바로가기
 
-- [모니터 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/monitor_specs.csv)
+- [모니터 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/monitor_specs.csv) — 맨 끝 `display_tech` 열 = 다나와 목록 필터 '디스플레이 기술'(퀀텀닷(QD) / Mini LED / 나노셀(NanoCell), 해당 없으면 빈칸)
 - [키보드 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/keyboard_specs.csv)
 - [노트북 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/laptop_specs.csv)
 - [TV 스펙](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/specs/tv_specs.csv)
@@ -193,6 +194,7 @@ TV 스펙:
 
 - [모니터 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/monitor_price_history.csv)
 - [모니터 가격 (배송비 포함) 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/monitor_ship_price_history.csv)
+- [모니터 Mini LED 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/monitor_miniled_price_history.csv)
 - [키보드 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/keyboard_price_history.csv)
 - [노트북 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/laptop_price_history.csv)
 - [TV 가격 60일 기록](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/history/tv_price_history.csv)
@@ -209,6 +211,7 @@ TV 스펙:
 ## 자동 업데이트
 
 - 모니터 가격정보: 매일 06:00 KST에 수집 (이어서 배송비 포함 가격 `monitor_ship.csv`도 수집)
+- 모니터 Mini LED 가격정보: 매일 06:05 KST에 수집 (`monitor_miniled.csv`)
 - 키보드/노트북 가격정보: 매일 07:00 KST에 수집
 - 그래픽카드/RAM/SSD 가격정보: 07:00~18:00 KST 매시간 정각에 수집 (그날 가격 칸을 최신 값으로 갱신, 시간대별 기록은 `data/hourly/날짜/`에 7일 보관)
 - TV 가격정보: 매일 07:30 KST에 수집
@@ -222,6 +225,7 @@ TV 스펙:
 사용하는 GitHub Actions는 아래와 같습니다.
 
 - [Update Danawa price CSV](.github/workflows/update-danawa-prices.yml)
+- [Update monitor Mini LED price CSV](.github/workflows/update-monitor-miniled-prices.yml)
 - [Update keyboard price CSV](.github/workflows/update-keyboard-prices.yml)
 - [Update laptop price CSV](.github/workflows/update-laptop-prices.yml)
 - [Update TV price CSV](.github/workflows/update-tv-prices.yml)
@@ -272,6 +276,12 @@ python scripts/crawl_danawa.py --category monitor --fail-on-empty --fetcher requ
 
 ```bash
 python scripts/crawl_danawa.py --category monitor --add-delivery --fail-on-empty --fetcher requests
+```
+
+모니터 Mini LED 가격 수집 — `data/latest/monitor_miniled.csv`, `data/history/monitor_miniled_price_history.csv`:
+
+```bash
+python scripts/crawl_danawa.py --category monitor_miniled --fail-on-empty --fetcher requests --skip-combined
 ```
 
 키보드 가격 수집:
@@ -346,6 +356,7 @@ python -m unittest discover -s tests
 현재 등록된 값:
 
 - `monitor`: 모니터
+- `monitor_miniled`: 모니터 중 '디스플레이 기술 → Mini LED' (목록 필터)
 - `desktop`: 데스크탑
 - `keyboard`: 키보드
 - `laptop`: 노트북

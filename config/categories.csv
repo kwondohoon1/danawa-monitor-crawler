@@ -1,4 +1,4 @@
-slug,name,url,pages
+slug,name,url,pages,search_attributes
 monitor,모니터,https://prod.danawa.com/list/?cate=112757,
 desktop,데스크탑,https://prod.danawa.com/list/?cate=112756,
 keyboard,키보드,https://prod.danawa.com/list/?cate=112782,
@@ -13,3 +13,4 @@ cooler,쿨러,https://prod.danawa.com/list/?cate=11236855,
 case,케이스,https://prod.danawa.com/list/?cate=112775,
 power,파워,https://prod.danawa.com/list/?cate=112777,
 tv,TV,https://prod.danawa.com/list/?cate=10248425,
+monitor_miniled,모니터 Mini LED,https://prod.danawa.com/list/?cate=112757,,373925|1145746|1145746|OR

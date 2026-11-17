@@ -1,0 +1,63 @@
+name: Update monitor Mini LED price CSV
+
+# 다나와 모니터 목록에서 '디스플레이 기술 → Mini LED' 를 체크한 목록만 받는다 (config/categories.csv 의 monitor_miniled)
+# -> data/latest/monitor_miniled.csv, data/history/monitor_miniled_price_history.csv (모니터 가격 CSV와 같은 양식)
+
+on:
+  schedule:
+    # 21:05 UTC = 06:05 KST (모니터 가격 수집 바로 뒤)
+    - cron: "5 21 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: danawa-data-updates
+  cancel-in-progress: false
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # A queued run (same concurrency group) would otherwise check out the commit from when it was
+          # triggered and then conflict with what the runs before it pushed. Take the branch tip at start.
+          ref: ${{ github.ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m unittest discover -s tests
+
+      - name: Crawl Mini LED monitor prices
+        run: python scripts/crawl_danawa.py --category monitor_miniled --fail-on-empty --fetcher requests --max-pages 100 --delay 0.1 --skip-combined
+
+      - name: Commit CSV changes
+        run: |
+          if [[ -n "$(git status --porcelain data/latest/monitor_miniled.csv data/history/monitor_miniled_price_history.csv)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/latest/monitor_miniled.csv data/history/monitor_miniled_price_history.csv
+            git commit -m "Update monitor Mini LED price CSV"
+            for attempt in 1 2 3 4 5; do
+              git pull --rebase origin main && git push && break
+              if [[ $attempt == 5 ]]; then exit 1; fi
+              sleep $((attempt * 10))
+            done
+          else
+            echo "No CSV changes"
+          fi

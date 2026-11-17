@@ -49,6 +49,9 @@ class Category:
     pages: int | None = None
     start_page: int = 1
     add_delivery: bool = False  # 목록 가격을 다나와 '배송비포함' 옵션으로 받음 (상품 페이지 최저가와 같은 기준)
+    # 다나와 목록 필터(옵션 전체보기의 체크박스). 값 하나가 searchAttributeValue[] 하나:
+    # '속성번호|값번호|값번호|OR' (예: 모니터 디스플레이 기술 Mini LED = 373925|1145746|1145746|OR)
+    search_attributes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -91,6 +94,7 @@ class DanawaListContext:
     coupang_member_sort_layer_type: str
     sort_method: str
     total_count: int | None
+    search_attributes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -175,10 +179,12 @@ def load_categories(config_path: Path) -> list[Category]:
             name = normalize_space(row.get("name", ""))
             url = normalize_space(row.get("url", ""))
             pages_text = normalize_space(row.get("pages", ""))
+            # 없는 열은 DictReader 가 None 으로 채운다 (search_attributes 를 안 쓰는 줄)
+            attributes = tuple(normalize_space(row.get("search_attributes") or "").split())
             if not slug or not name or not url:
                 continue
             pages = max(1, int(pages_text)) if pages_text else None
-            categories.append(Category(slug=slug, name=name, url=url, pages=pages))
+            categories.append(Category(slug=slug, name=name, url=url, pages=pages, search_attributes=attributes))
     if not categories:
         raise CrawlerError(f"No categories found in {config_path}")
     return categories
@@ -448,6 +454,8 @@ def fetch_list_context(category: Category, list_count: int, timeout: int) -> Dan
         session = make_session()
         try:
             context = parse_list_context(fetch_with_requests(session, url, timeout))
+            if category.search_attributes:
+                context = replace(context, search_attributes=category.search_attributes)
             return replace(context, add_delivery="Y") if category.add_delivery else context
         except Exception as exc:  # noqa: BLE001
             last_error = exc
@@ -524,10 +532,12 @@ def fetch_ajax_product_list(
         payload["priceRangeMinPrice"] = price_min
     if price_max is not None:
         payload["priceRangeMaxPrice"] = price_max
+    # 필터는 같은 이름(searchAttributeValue[])으로 여러 개 보낼 수 있어서 (이름, 값) 목록으로 보낸다
+    data = list(payload.items()) + [("searchAttributeValue[]", value) for value in context.search_attributes]
 
     response = session.post(
         f"{BASE_URL}/list/ajax/getProductList.ajax.php",
-        data=payload,
+        data=data,
         headers={
             "Referer": referer,
             "X-Requested-With": "XMLHttpRequest",
@@ -954,7 +964,7 @@ def crawl_category_by_price(
 ) -> list[Product]:
     referer_url = category_page_url(category, 1, list_count)
     context = fetch_list_context(category, list_count, timeout)
-    if context.total_count:
+    if context.total_count and not category.search_attributes:  # 필터를 건 목록이면 페이지 숫자는 필터 전 전체 개수
         print(f"[{category.slug}] Danawa reports {context.total_count:,} products before price splitting")
 
     min_price = first_price_for_sort(session, context, category, referer_url, "MinPrice", timeout)
@@ -1353,13 +1363,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if page_end is not None:
         categories = [
-            Category(
-                slug=category.slug,
-                name=category.name,
-                url=category.url,
-                pages=max(1, page_end),
-                start_page=args.page_start,
-            )
+            replace(category, pages=max(1, page_end), start_page=args.page_start)  # 필터(search_attributes)는 그대로
             for category in categories
         ]
     if args.add_delivery:

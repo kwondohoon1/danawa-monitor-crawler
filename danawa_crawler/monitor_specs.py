@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import dataclasses
 import re
 import threading
 import time
@@ -14,6 +15,7 @@ from typing import Iterable
 import requests
 from bs4 import BeautifulSoup
 
+from danawa_crawler import core
 from danawa_crawler.core import DEFAULT_USER_AGENT, normalize_space
 
 
@@ -37,7 +39,14 @@ SPEC_FIELDS = [
     "error",
     # Appended last so positional readers of the older columns keep working.
     "image_url",
+    "display_tech",
 ]
+
+# 다나와 모니터 목록 필터 '디스플레이 기술' (2026-11 추가: 퀀텀닷(QD) · Mini LED · 나노셀(NanoCell)).
+# 상품 페이지 요약 스펙에는 이 값이 없고, 아래 상세 스펙표는 새 디자인 페이지에만 있다(옛 페이지는 절반쯤 섞여 옴).
+# 그래서 목록에서 필터를 하나씩 걸어 받은 상품 코드로 채운다 → 다나와 분류와 똑같고 요청도 몇 번뿐.
+DISPLAY_TECH_TITLE = "디스플레이 기술"
+MONITOR_LIST_URL = "https://prod.danawa.com/list/?cate=112757"
 
 _thread_local = threading.local()
 
@@ -392,6 +401,58 @@ def fetch_one(item: MonitorInput, collected_at: str, timeout: int, retries: int)
     return empty_row(item, collected_at, "error", last_error)
 
 
+def display_tech_options(search_option: dict) -> list[tuple[str, str]]:
+    """[(이름, searchAttributeValue)] of the '디스플레이 기술' filter in Danawa's search-option answer."""
+    for group in search_option.get("filterGroups") or []:
+        if group.get("title") != DISPLAY_TECH_TITLE:
+            continue
+        seq = (group.get("metadata") or {}).get("attributeSeq")
+        options = group.get("allOptions") or group.get("baseOptions") or []
+        return [
+            (o["label"], f"{seq}|{o['value']}|{o['value']}|{(o.get('metadata') or {}).get('multiSelectType', 'OR')}")
+            for o in options
+        ]
+    raise ValueError(f"'{DISPLAY_TECH_TITLE}' filter not found")
+
+
+def display_tech_by_code(timeout: int = 20) -> dict[str, str]:
+    """product code -> '퀀텀닷(QD) / Mini LED' (filter order), from Danawa's list filtered by each option."""
+    base = core.Category(slug="monitor_display_tech", name="모니터", url=MONITOR_LIST_URL)
+    context = core.fetch_list_context(base, 90, timeout)
+    session = core.make_session()
+    response = session.get(
+        f"{core.BASE_URL}/api/list/search-option/",
+        params={"categoryCode": context.list_category_code, "mode": "extend"},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    labels: dict[str, list[str]] = {}
+    collected_at = core.now_kst_iso()
+    for label, value in display_tech_options(response.json()):
+        products = core.crawl_category(
+            category=dataclasses.replace(base, search_attributes=(value,)),
+            session=session,
+            collected_at=collected_at,
+            fetcher="requests",
+            list_count=90,
+            max_pages=100,
+            delay=0.1,
+            timeout=timeout,
+            selenium_fetcher=None,
+        )
+        print(f"monitor specs: {DISPLAY_TECH_TITLE} {label} {len(products)}")
+        for product in products:
+            labels.setdefault(product.product_code, []).append(label)
+    return {code: " / ".join(names) for code, names in labels.items()}
+
+
+def previous_display_tech(output_path: Path) -> dict[str, str]:
+    if not output_path.exists():
+        return {}
+    with output_path.open("r", encoding="utf-8-sig", newline="") as file:
+        return {row["product_code"]: row.get("display_tech") or "" for row in csv.DictReader(file)}
+
+
 def write_csv(path: Path, rows: Iterable[dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8-sig", newline="") as file:
@@ -430,6 +491,13 @@ def crawl_monitor_specs(
     if errors:
         kept = keep_previous_specs(output_path, ordered, SPEC_FIELDS)
         print(f"monitor specs: {errors}/{len(ordered)} failed, {kept} kept from the previous file")
+    try:
+        tech = display_tech_by_code(timeout)
+    except Exception as exc:  # noqa: BLE001 - 목록 필터를 못 받으면 어제 값을 그대로 둔다
+        tech = previous_display_tech(output_path)
+        print(f"monitor specs: {DISPLAY_TECH_TITLE} list failed ({type(exc).__name__}: {exc}), kept the previous values")
+    for row in ordered:
+        row["display_tech"] = tech.get(row["product_code"], "")
     write_csv(output_path, ordered)
     return len(ordered), errors
 
