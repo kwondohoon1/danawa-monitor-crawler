@@ -1,7 +1,9 @@
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
-from danawa_crawler.daily_watchdog import DAILY_WORKFLOWS, pick_retry
+from danawa_crawler.daily_watchdog import DAILY_WORKFLOWS, due_times, pick_retry
 
 KST = timezone(timedelta(hours=9))
 NOW = datetime(2026, 11, 12, 11, 30, tzinfo=KST)  # 11-12 오전, 다나와가 GitHub 서버를 막았던 날
@@ -53,6 +55,45 @@ class DailyWatchdogTests(unittest.TestCase):
         runs = {wf: [run(90)] for wf in DAILY_WORKFLOWS}
         self.assertEqual(pick_retry(runs, NOW), DAILY_WORKFLOWS[0])
         self.assertEqual(DAILY_WORKFLOWS[0], "update-danawa-prices.yml")
+
+
+DUE = {"update-danawa-prices.yml": (6, 0), "update-keyboard-prices.yml": (7, 0)}
+
+
+class LateScheduleTests(unittest.TestCase):
+    """GitHub 예약이 몇 시간씩 늦으므로, 예약 시각 + 2시간까지 안 돌았으면 직접 시작한다 (11-20 요청)."""
+
+    def at(self, hour: int, minute: int = 0) -> datetime:
+        return datetime(2026, 11, 20, hour, minute, tzinfo=KST)
+
+    def test_not_started_two_hours_after_schedule_is_started(self):
+        self.assertEqual(pick_retry({}, self.at(8, 1), DUE), "update-danawa-prices.yml")
+
+    def test_waits_until_two_hours_after_schedule(self):
+        self.assertIsNone(pick_retry({}, self.at(7, 59), DUE))
+
+    def test_each_workflow_has_its_own_time(self):
+        runs = {"update-danawa-prices.yml": [{"status": "completed", "conclusion": "success",
+                                              "createdAt": "2026-11-19T23:00:00Z", "updatedAt": "2026-11-19T23:20:00Z"}]}
+        self.assertIsNone(pick_retry(runs, self.at(8, 30), DUE))
+        self.assertEqual(pick_retry(runs, self.at(9, 1), DUE), "update-keyboard-prices.yml")
+
+    def test_not_started_while_group_is_busy(self):
+        runs = {"update-tv-prices.yml": [{"status": "in_progress", "conclusion": None,
+                                          "createdAt": "2026-11-19T23:50:00Z", "updatedAt": "2026-11-19T23:50:00Z"}]}
+        self.assertIsNone(pick_retry(runs, self.at(8, 30), DUE))
+
+    def test_due_times_are_read_from_workflow_crons(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "update-danawa-prices.yml").write_text(
+                'on:\n  schedule:\n    # 21:00 UTC = 06:00 KST\n    - cron: "0 21 * * *"\n', encoding="utf-8")
+            (Path(tmp) / "update-monitor-miniled-prices.yml").write_text(
+                'on:\n  schedule:\n    - cron: "5 21 * * *"\n', encoding="utf-8")
+            self.assertEqual(due_times(Path(tmp)), {"update-danawa-prices.yml": (6, 0),
+                                                    "update-monitor-miniled-prices.yml": (6, 5)})
+
+    def test_monitor_miniled_is_watched(self):
+        self.assertIn("update-monitor-miniled-prices.yml", DAILY_WORKFLOWS)
 
 
 if __name__ == "__main__":

@@ -171,7 +171,7 @@ def main() -> int:
             wait = (hand_at - now_kst()).total_seconds()
             if wait > 0:
                 print(f"Next collection {upcoming:%m-%d %H:%M}; waiting {wait / 60:.0f} min, then handing over", flush=True)
-                time.sleep(wait)
+                sleep_with_watchdog(wait, use_git)   # 밤 사이 이른 아침 하루 수집(04~08시 예약)도 챙김
             print(f"Handing over before {upcoming:%m-%d %H:%M} (job time limit)", flush=True)
             if use_git:
                 hand_over()
