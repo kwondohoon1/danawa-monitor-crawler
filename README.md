@@ -25,7 +25,7 @@ CPU, 그래픽카드, 메인보드, RAM, SSD, HDD, 쿨러, 케이스, 파워는 
 | 15:00 | 미수집 | — | — | — |
 | 16:00 | 미수집 | — | — | — |
 | 17:00 | 17:52 | [853개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-11-20/gpu_17.csv) | [1,010개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-11-20/ram_17.csv) | [1,777개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-11-20/ssd_17.csv) |
-| 18:00 | 대기 | — | — | — |
+| 18:00 | 18:20 | [853개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-11-20/gpu_18.csv) | [1,010개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-11-20/ram_18.csv) | [1,777개](https://github.com/kwondohoon1/danawa-monitor-crawler/blob/main/data/hourly/2026-11-20/ssd_18.csv) |
 
 지난 7일 시간대별 기록:
 
