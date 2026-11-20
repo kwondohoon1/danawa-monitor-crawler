@@ -58,7 +58,10 @@ def crawl(categories: list[str]) -> bool:
 
 
 def commit_and_push(categories: list[str], message: str) -> None:
-    paths = ["README.md", "data/hourly"]
+    # data/state/listings_seen.csv·eleven_stores.csv: 사기 의심 판매 거르기의 '처음 본 날'·11번가 상점 기록.
+    # 빠져 있던 11-02~11-20 동안 매 실행 11-02 상태로 돌아갔고, 커밋 안 된 변경 때문에 pull --rebase 가 거부돼
+    # 다른 수집이 먼저 푸시한 날엔 작업이 죽었다.
+    paths = ["README.md", "data/hourly", "data/state/listings_seen.csv", "data/state/eleven_stores.csv"]
     for category in categories:
         paths += [
             f"data/latest/{category}.csv",
@@ -74,7 +77,7 @@ def commit_and_push(categories: list[str], message: str) -> None:
         return
     run(["git", "commit", "-m", message])
     for attempt in range(1, 6):
-        run(["git", "pull", "--rebase", "origin", "main"], check=False)
+        run(["git", "pull", "--rebase", "--autostash", "origin", "main"], check=False)  # 남은 변경이 있어도 당겨 받음
         if run(["git", "push"], check=False).returncode == 0:
             return
         time.sleep(10 * attempt)
@@ -152,7 +155,7 @@ def main() -> int:
         day, hour = now.date().isoformat(), current_slot(now)
         if hour is not None:
             if use_git:
-                run(["git", "pull", "--rebase", "origin", "main"], check=False)
+                run(["git", "pull", "--rebase", "--autostash", "origin", "main"], check=False)
             if slot_done(ROOT / "data", day, hour, categories):
                 print(f"{day} {hour:02d}:00 already collected", flush=True)
             else:
