@@ -160,6 +160,10 @@ def main() -> int:
                 print(f"{day} {hour:02d}:00 already collected", flush=True)
             else:
                 collect(day, hour, categories, use_git)
+                if not args.once and current_slot(now_kst()) not in (None, hour):
+                    # 수집이 다음 정각을 넘겨 끝났으면 그 시간 몫을 바로 수집
+                    # (아래 next_collection 은 이미 지난 정각을 건너뛰어 그 시간이 통째로 빠졌다)
+                    continue
 
         if args.once:
             return 0
